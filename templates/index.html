@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-upload display-4 text-primary mb-3"></i>
+                <h3>Importar Dados</h3>
+                <p>Importe arquivos XLSX ou CSV com os dados de abastecimento</p>
+                <a href="/importar" class="btn btn-primary">
+                    <i class="bi bi-upload"></i> Importar Dados
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up display-4 text-success mb-3"></i>
+                <h3>Gerar Relatórios</h3>
+                <p>Analise os dados com relatórios personalizados</p>
+                <a href="/relatorios" class="btn btn-success">
+                    <i class="bi bi-graph-up"></i> Ver Relatórios
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

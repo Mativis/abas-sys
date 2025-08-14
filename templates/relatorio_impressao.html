@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Abastecimentos</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+        }
+        .no-print {
+            display: none;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                padding: 0;
+                margin: 0;
+            }
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #2c3e50;
+            font-size: 14px;
+            margin-top: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            page-break-inside: avoid;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            padding: 5px;
+            text-align: left;
+        }
+        td {
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .filtros {
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 10px;
+            text-align: right;
+            color: #7f8c8d;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Relatório de Abastecimentos</h1>
+        <div class="filtros">
+            <h2>Filtros Aplicados</h2>
+            <p><strong>Período:</strong> {{ filtros.data_inicio }} até {{ filtros.data_fim }}</p>
+            {% if filtros.placa %}<p><strong>Placa:</strong> {{ filtros.placa }}</p>{% endif %}
+            {% if filtros.centro_custo %}<p><strong>Centro de Custo:</strong> {{ filtros.centro_custo }}</p>{% endif %}
+            {% if filtros.combustivel %}<p><strong>Combustível:</strong> {{ filtros.combustivel }}</p>{% endif %}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Placa</th>
+                <th>Centro de Custo</th>
+                <th>Combustível</th>
+                <th class="text-right">Litros</th>
+                <th class="text-right">Odômetro</th>
+                <th class="text-right">KM/L</th>
+                <th class="text-right">Valor (R$)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in dados %}
+            <tr>
+                <td>{{ item.data }}</td>
+                <td>{{ item.placa }}</td>
+                <td>{{ item.centro_custo if item.centro_custo else '-' }}</td>
+                <td>{{ item.combustivel }}</td>
+                <td class="text-right">{{ "%.3f"|format(item.litros) }}</td>
+                <td class="text-right">{{ "%.1f"|format(item.odometro) if item.odometro else '-' }}</td>
+                <td class="text-right">{{ "%.2f"|format(item.km_litro) if item.km_litro else '-' }}</td>
+                <td class="text-right">{{ "%.2f"|format(item.custo_liquido) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Emitido em: {{ data_emissao }}</p>
+    </div>
+
+    <div class="actions no-print">
+        <button onclick="window.print()">Imprimir Relatório</button>
+        <button onclick="window.close()">Fechar</button>
+    </div>
+</body>
+</html>

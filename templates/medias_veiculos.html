@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <i class="bi bi-speedometer2"></i> Médias de Consumo por Veículo
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-bar-chart"></i> Média de KM/L por Veículo
+                    </div>
+                    <div class="card-body">
+                        <div class="grafico-container">
+                            <img src="{{ url_for('static', filename='grafico_kml.png') }}" class="img-fluid">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-table"></i> Dados de Consumo
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Placa</th>
+                                        <th>Média KM/L</th>
+                                        <th>Total Abastecimentos</th>
+                                        <th>KM Atual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in dados %}
+                                    <tr>
+                                        <td>{{ item.placa }}</td>
+                                        <td>{{ "%.2f"|format(item.media_kml) }}</td>
+                                        <td>{{ item.total_abastecimentos }}</td>
+                                        <td>{{ "%.1f"|format(item.km_atual) if item.km_atual else '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
