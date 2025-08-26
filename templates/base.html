@@ -43,6 +43,10 @@
             background-color: rgba(255,255,255,0.2);
             font-weight: bold;
         }
+        .btn-action {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
@@ -59,9 +63,6 @@
                     <div class="navbar-nav">
                         <a class="nav-link {{ 'active' if active_page == 'index' }}" href="/">
                             <i class="bi bi-house"></i> Início
-                        </a>
-                        <a class="nav-link {{ 'active' if active_page == 'importar' }}" href="/importar">
-                            <i class="bi bi-upload"></i> Importar
                         </a>
                         <a class="nav-link {{ 'active' if active_page == 'relatorios' }}" href="/relatorios">
                             <i class="bi bi-graph-up"></i> Relatórios

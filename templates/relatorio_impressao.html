@@ -6,13 +6,14 @@
     <style>
         @page {
             size: A4;
-            margin: 1cm;
+            margin: 1.5cm;
         }
         body {
             font-family: Arial, sans-serif;
             font-size: 12px;
             margin: 0;
             padding: 0;
+            color: #333;
         }
         .no-print {
             display: none;
@@ -30,12 +31,14 @@
             color: #2c3e50;
             text-align: center;
             font-size: 18px;
-            margin-bottom: 20px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
         }
         h2 {
             color: #2c3e50;
             font-size: 14px;
             margin-top: 0;
+            margin-bottom: 5px;
         }
         table {
             width: 100%;
@@ -46,16 +49,18 @@
         th {
             background-color: #3498db;
             color: white;
-            padding: 5px;
+            padding: 6px;
             text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
         }
         td {
-            padding: 5px;
-            border-bottom: 1px solid #ddd;
+            padding: 6px;
+            border: 1px solid #ddd;
         }
         .header {
-            margin-bottom: 20px;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
             padding-bottom: 10px;
         }
         .filtros {
@@ -63,11 +68,12 @@
             background-color: #f8f9fa;
             padding: 10px;
             border-radius: 5px;
+            border: 1px solid #ddd;
         }
         .footer {
             margin-top: 20px;
             font-size: 10px;
-            text-align: right;
+            text-align: center;
             color: #7f8c8d;
             border-top: 1px solid #eee;
             padding-top: 10px;
@@ -78,18 +84,98 @@
         .text-center {
             text-align: center;
         }
+        .total-row {
+            background-color: #e3f2fd;
+            font-weight: bold;
+        }
+        .resumo {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .resumo-item {
+            display: inline-block;
+            margin-right: 20px;
+            padding: 5px 10px;
+            background-color: white;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+        }
+        
+        /* Novos estilos para o layout reformulado */
+        .cabecalho-relatorio {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .cabecalho-relatorio .logo {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .cabecalho-relatorio .titulo {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .cabecalho-relatorio .periodo {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .assinaturas {
+            margin-top: 30px;
+            page-break-inside: avoid;
+        }
+        .linha-assinaturas {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 50px;
+        }
+        .area-assinatura {
+            width: 30%;
+            text-align: center;
+            border-top: 1px solid #000;
+            padding-top: 40px;
+        }
+        .nome-setor {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .rodape {
+            margin-top: 20px;
+            font-size: 10px;
+            text-align: center;
+            color: #7f8c8d;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+        
+        .quebrapagina {
+            page-break-after: always;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Relatório de Abastecimentos</h1>
-        <div class="filtros">
-            <h2>Filtros Aplicados</h2>
-            <p><strong>Período:</strong> {{ filtros.data_inicio }} até {{ filtros.data_fim }}</p>
-            {% if filtros.placa %}<p><strong>Placa:</strong> {{ filtros.placa }}</p>{% endif %}
-            {% if filtros.centro_custo %}<p><strong>Centro de Custo:</strong> {{ filtros.centro_custo }}</p>{% endif %}
-            {% if filtros.combustivel %}<p><strong>Combustível:</strong> {{ filtros.combustivel }}</p>{% endif %}
-        </div>
+    <div class="cabecalho-relatorio">
+        <div class="logo">NOME DA EMPRESA</div>
+        <div class="titulo">RELATÓRIO DE ABASTECIMENTOS</div>
+        <div class="periodo">Período: {{ filtros.data_inicio }} até {{ filtros.data_fim }}</div>
+    </div>
+
+    <div class="filtros">
+        <h2>FILTROS APLICADOS</h2>
+        <p><strong>Período:</strong> {{ filtros.data_inicio }} até {{ filtros.data_fim }}</p>
+        {% if filtros.placa %}<p><strong>Placa:</strong> {{ filtros.placa }}</p>{% endif %}
+        {% if filtros.centro_custo %}<p><strong>Centro de Custo:</strong> {{ filtros.centro_custo }}</p>{% endif %}
+        {% if filtros.combustivel %}<p><strong>Combustível:</strong> {{ filtros.combustivel }}</p>{% endif %}
+        {% if filtros.posto %}<p><strong>Posto:</strong> {{ filtros.posto }}</p>{% endif %}
     </div>
 
     <table>
@@ -99,6 +185,7 @@
                 <th>Placa</th>
                 <th>Centro de Custo</th>
                 <th>Combustível</th>
+                <th>Posto</th>
                 <th class="text-right">Litros</th>
                 <th class="text-right">Odômetro</th>
                 <th class="text-right">KM/L</th>
@@ -112,6 +199,7 @@
                 <td>{{ item.placa }}</td>
                 <td>{{ item.centro_custo if item.centro_custo else '-' }}</td>
                 <td>{{ item.combustivel }}</td>
+                <td>{{ item.posto if item.posto else '-' }}</td>
                 <td class="text-right">{{ "%.3f"|format(item.litros) }}</td>
                 <td class="text-right">{{ "%.1f"|format(item.odometro) if item.odometro else '-' }}</td>
                 <td class="text-right">{{ "%.2f"|format(item.km_litro) if item.km_litro else '-' }}</td>
@@ -119,10 +207,56 @@
             </tr>
             {% endfor %}
         </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="5">TOTAL</td>
+                <td class="text-right">{{ "%.3f"|format(dados|sum(attribute='litros')) }}</td>
+                <td colspan="2"></td>
+                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}</td>
+            </tr>
+        </tfoot>
     </table>
+
+    <div class="resumo">
+        <div class="resumo-item">
+            <strong>Total de Registros:</strong> {{ dados|length }}
+        </div>
+        <div class="resumo-item">
+            <strong>Total Litros:</strong> {{ "%.3f"|format(dados|sum(attribute='litros')) }} L
+        </div>
+        <div class="resumo-item">
+            <strong>Total Valor:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}
+        </div>
+        <div class="resumo-item">
+            <strong>Postos Diferentes:</strong> {{ dados|map(attribute='posto')|unique|list|length }}
+        </div>
+    </div>
+
+    <div class="assinaturas">
+        <div class="linha-assinaturas">
+            <div class="area-assinatura">
+                <div class="nome-setor">DEPARTAMENTO DE LOGÍSTICA</div>
+                <div>Nome e Assinatura</div>
+                <div>Data: ___/___/_____</div>
+            </div>
+            
+            <div class="area-assinatura">
+                <div class="nome-setor">COORDENAÇÃO</div>
+                <div>Nome e Assinatura</div>
+                <div>Data: ___/___/_____</div>
+            </div>
+            
+            <div class="area-assinatura">
+                <div class="nome-setor">DIRETORIA</div>
+                <div>Nome e Assinatura</div>
+                <div>Data: ___/___/_____</div>
+            </div>
+        </div>
+    </div>
 
     <div class="footer">
         <p>Emitido em: {{ data_emissao }}</p>
+        <p>Sistema de Abastecimentos - Relatório Gerado Automaticamente</p>
     </div>
 
     <div class="actions no-print">

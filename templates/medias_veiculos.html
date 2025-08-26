@@ -3,47 +3,125 @@
 {% block content %}
 <div class="card">
     <div class="card-header bg-success text-white">
-        <i class="bi bi-speedometer2"></i> Médias de Consumo por Veículo
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-speedometer2"></i> Médias de Consumo por Veículo
+            </div>
+            <div>
+                <button class="btn btn-light btn-sm" onclick="atualizarDados()">
+                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                </button>
+            </div>
+        </div>
     </div>
     <div class="card-body">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="filtroPlaca" class="form-control" placeholder="Filtrar por placa...">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select id="filtroOrdenacao" class="form-select">
+                    <option value="kml-desc">Maior KM/L primeiro</option>
+                    <option value="kml-asc">Menor KM/L primeiro</option>
+                    <option value="placa-asc">Placa (A-Z)</option>
+                    <option value="placa-desc">Placa (Z-A)</option>
+                    <option value="gasto-desc">Maior gasto primeiro</option>
+                    <option value="gasto-asc">Menor gasto primeiro</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="filtroApenasAtivos" checked>
+                    <label class="form-check-label" for="filtroApenasAtivos">Apenas veículos ativos</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards de Resumo -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center bg-primary text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-car-front"></i> Veículos</h5>
+                        <h3 id="total-veiculos">0</h3>
+                        <small>Total cadastrados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-info text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-fuel-pump"></i> Média Geral</h5>
+                        <h3 id="media-geral">0.00</h3>
+                        <small>KM/L médio</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-warning text-dark">
+                    <div class="card-body">
+                        <h5><i class="bi bi-currency-dollar"></i> Gasto Total</h5>
+                        <h3 id="gasto-total">R$ 0,00</h3>
+                        <small>Total em combustível</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-success text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-lightning-charge"></i> Melhor</h5>
+                        <h3 id="melhor-consumo">0.00</h3>
+                        <small>KM/L do melhor</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico e Tabela -->
         <div class="row">
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header">
-                        <i class="bi bi-bar-chart"></i> Média de KM/L por Veículo
+                        <i class="bi bi-bar-chart"></i> Desempenho por Veículo (KM/L)
                     </div>
                     <div class="card-body">
                         <div class="grafico-container">
-                            <img src="{{ url_for('static', filename='grafico_kml.png') }}" class="img-fluid">
+                            <canvas id="graficoKML" height="300"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card mb-4">
+                <div class="card">
                     <div class="card-header">
-                        <i class="bi bi-table"></i> Dados de Consumo
+                        <i class="bi bi-table"></i> Dados Detalhados
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
+                            <table class="table table-striped table-hover" id="tabelaMedias">
+                                <thead class="table-dark">
                                     <tr>
                                         <th>Placa</th>
-                                        <th>Média KM/L</th>
-                                        <th>Total Abastecimentos</th>
-                                        <th>KM Atual</th>
+                                        <th class="text-end">KM/L</th>
+                                        <th class="text-end">Abastecimentos</th>
+                                        <th class="text-end">KM Atual</th>
+                                        <th class="text-end">Gasto Total</th>
+                                        <th class="text-center">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for item in dados %}
+                                <tbody id="corpoTabela">
                                     <tr>
-                                        <td>{{ item.placa }}</td>
-                                        <td>{{ "%.2f"|format(item.media_kml) }}</td>
-                                        <td>{{ item.total_abastecimentos }}</td>
-                                        <td>{{ "%.1f"|format(item.km_atual) if item.km_atual else '-' }}</td>
+                                        <td colspan="6" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Carregando...</span>
+                                            </div>
+                                            <p class="mt-2">Carregando dados...</p>
+                                        </td>
                                     </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -51,6 +129,500 @@
                 </div>
             </div>
         </div>
+
+        <!-- Gráfico de Gasto -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-pie-chart"></i> Distribuição de Gastos por Veículo
+                    </div>
+                    <div class="card-body">
+                        <div class="grafico-container">
+                            <canvas id="graficoGastos" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- Modal de Detalhes -->
+<div class="modal fade" id="detalhesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitulo">Detalhes do Veículo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <i class="bi bi-info-circle"></i> Informações
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-6"><strong>Placa:</strong></div>
+                                    <div class="col-6" id="detalhePlaca">-</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-6"><strong>KM Atual:</strong></div>
+                                    <div class="col-6" id="detalheKmAtual">-</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-6"><strong>Total Abastecimentos:</strong></div>
+                                    <div class="col-6" id="detalheTotalAbastecimentos">-</div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6"><strong>Status:</strong></div>
+                                    <div class="col-6">
+                                        <span class="badge bg-success" id="detalheStatus">Ativo</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <i class="bi bi-graph-up"></i> Desempenho
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-6"><strong>Média KM/L:</strong></div>
+                                    <div class="col-6" id="detalheMediaKml">-</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-6"><strong>Média Litros/Abast.:</strong></div>
+                                    <div class="col-6" id="detalheMediaLitros">-</div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6"><strong>Gasto Total:</strong></div>
+                                    <div class="col-6 fw-bold" id="detalheGastoTotal">R$ 0,00</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-clock-history"></i> Histórico Recente
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th class="text-end">Litros</th>
+                                        <th class="text-end">KM/L</th>
+                                        <th class="text-end">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detalheHistorico">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Carregando histórico...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="verRelatorioVeiculo()">
+                    <i class="bi bi-list"></i> Ver Relatório Completo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Incluir Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Variáveis globais
+let dadosMedias = [];
+let graficoKML = null;
+let graficoGastos = null;
+
+// Carregar dados ao iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    carregarDados();
+    configurarFiltros();
+});
+
+function carregarDados() {
+    fetch('/medias-veiculos-dados')
+        .then(response => response.json())
+        .then(data => {
+            dadosMedias = data;
+            atualizarInterface();
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dados:', error);
+            document.getElementById('corpoTabela').innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-danger py-4">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <p>Erro ao carregar dados. Tente novamente.</p>
+                    </td>
+                </tr>
+            `;
+        });
+}
+
+function configurarFiltros() {
+    // Filtro de placa
+    document.getElementById('filtroPlaca').addEventListener('input', filtrarTabela);
+    
+    // Filtro de ordenação
+    document.getElementById('filtroOrdenacao').addEventListener('change', filtrarTabela);
+    
+    // Filtro de veículos ativos
+    document.getElementById('filtroApenasAtivos').addEventListener('change', filtrarTabela);
+}
+
+function filtrarTabela() {
+    const filtroPlaca = document.getElementById('filtroPlaca').value.toLowerCase();
+    const ordenacao = document.getElementById('filtroOrdenacao').value;
+    const apenasAtivos = document.getElementById('filtroApenasAtivos').checked;
+
+    let dadosFiltrados = dadosMedias.filter(veiculo => {
+        const placaMatch = veiculo.placa.toLowerCase().includes(filtroPlaca);
+        const ativoMatch = !apenasAtivos || (veiculo.km_atual && veiculo.km_atual > 0);
+        return placaMatch && ativoMatch;
+    });
+
+    // Ordenação
+    switch(ordenacao) {
+        case 'kml-desc':
+            dadosFiltrados.sort((a, b) => (b.media_kml || 0) - (a.media_kml || 0));
+            break;
+        case 'kml-asc':
+            dadosFiltrados.sort((a, b) => (a.media_kml || 0) - (b.media_kml || 0));
+            break;
+        case 'placa-asc':
+            dadosFiltrados.sort((a, b) => a.placa.localeCompare(b.placa));
+            break;
+        case 'placa-desc':
+            dadosFiltrados.sort((a, b) => b.placa.localeCompare(a.placa));
+            break;
+        case 'gasto-desc':
+            dadosFiltrados.sort((a, b) => (b.total_gasto || 0) - (a.total_gasto || 0));
+            break;
+        case 'gasto-asc':
+            dadosFiltrados.sort((a, b) => (a.total_gasto || 0) - (b.total_gasto || 0));
+            break;
+    }
+
+    atualizarTabela(dadosFiltrados);
+    atualizarGraficos(dadosFiltrados);
+    atualizarResumo(dadosFiltrados);
+}
+
+function atualizarInterface() {
+    filtrarTabela();
+    atualizarGraficos(dadosMedias);
+    atualizarResumo(dadosMedias);
+}
+
+function atualizarTabela(dados) {
+    const tbody = document.getElementById('corpoTabela');
+    
+    if (dados.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center py-4">
+                    <i class="bi bi-inbox"></i>
+                    <p class="text-muted">Nenhum veículo encontrado com os filtros aplicados.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    let html = '';
+    dados.forEach(veiculo => {
+        const mediaKml = veiculo.media_kml ? veiculo.media_kml.toFixed(2) : '-';
+        const kmAtual = veiculo.km_atual ? veiculo.km_atual.toFixed(1) : '-';
+        const totalGasto = veiculo.total_gasto ? veiculo.total_gasto.toFixed(2) : '0.00';
+        const status = veiculo.km_atual && veiculo.km_atual > 0;
+        
+        // Cor baseada no consumo
+        let corKml = 'secondary';
+        if (veiculo.media_kml) {
+            if (veiculo.media_kml > 10) corKml = 'success';
+            else if (veiculo.media_kml > 7) corKml = 'warning';
+            else corKml = 'danger';
+        }
+
+        html += `
+            <tr style="cursor: pointer;" onclick="mostrarDetalhes('${veiculo.placa}')">
+                <td>
+                    <span class="badge bg-primary">${veiculo.placa}</span>
+                </td>
+                <td class="text-end">
+                    ${veiculo.media_kml ? `
+                    <span class="badge bg-${corKml}">${mediaKml} KM/L</span>
+                    ` : '<span class="badge bg-secondary">N/A</span>'}
+                </td>
+                <td class="text-end">${veiculo.total_abastecimentos}</td>
+                <td class="text-end">${kmAtual}</td>
+                <td class="text-end fw-bold">R$ ${totalGasto}</td>
+                <td class="text-center">
+                    <span class="badge ${status ? 'bg-success' : 'bg-secondary'}">
+                        ${status ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function atualizarGraficos(dados) {
+    // Dados para gráficos (apenas veículos com dados válidos)
+    const dadosValidos = dados.filter(v => v.media_kml && v.total_gasto);
+    
+    if (dadosValidos.length === 0) {
+        // Limpar gráficos se não houver dados
+        if (graficoKML) graficoKML.destroy();
+        if (graficoGastos) graficoGastos.destroy();
+        
+        // Mostrar mensagem de nenhum dado
+        document.getElementById('graficoKML').getContext('2d').clearRect(0, 0, 
+            document.getElementById('graficoKML').width, 
+            document.getElementById('graficoKML').height);
+        document.getElementById('graficoGastos').getContext('2d').clearRect(0, 0, 
+            document.getElementById('graficoGastos').width, 
+            document.getElementById('graficoGastos').height);
+        return;
+    }
+
+    // Ordenar por KM/L para o gráfico
+    const dadosOrdenados = [...dadosValidos].sort((a, b) => b.media_kml - a.media_kml);
+    const top10 = dadosOrdenados.slice(0, 10);
+
+    // Gráfico de KM/L
+    const ctxKML = document.getElementById('graficoKML').getContext('2d');
+    if (graficoKML) graficoKML.destroy();
+    
+    graficoKML = new Chart(ctxKML, {
+        type: 'bar',
+        data: {
+            labels: top10.map(v => v.placa),
+            datasets: [{
+                label: 'KM/L',
+                data: top10.map(v => v.media_kml),
+                backgroundColor: top10.map(v => {
+                    if (v.media_kml > 10) return '#28a745';
+                    if (v.media_kml > 7) return '#ffc107';
+                    return '#dc3545';
+                }),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Top 10 Veículos - Melhor Consumo'
+                },
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'KM por Litro'
+                    }
+                }
+            }
+        }
+    });
+
+    // Gráfico de pizza para gastos
+    const ctxGastos = document.getElementById('graficoGastos').getContext('2d');
+    if (graficoGastos) graficoGastos.destroy();
+    
+    // Agrupar por placa para o gráfico de pizza
+    const dadosGastos = dadosValidos
+        .sort((a, b) => b.total_gasto - a.total_gasto)
+        .slice(0, 8);
+    
+    graficoGastos = new Chart(ctxGastos, {
+        type: 'pie',
+        data: {
+            labels: dadosGastos.map(v => v.placa),
+            datasets: [{
+                data: dadosGastos.map(v => v.total_gasto),
+                backgroundColor: [
+                    '#007bff', '#28a745', '#dc3545', '#ffc107',
+                    '#17a2b8', '#6f42c1', '#fd7e14', '#20c997'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                title: {
+                    display: true,
+                    text: 'Distribuição de Gastos por Veículo'
+                }
+            }
+        }
+    });
+}
+
+function atualizarResumo(dados) {
+    const dadosValidos = dados.filter(v => v.media_kml && v.media_kml > 0);
+    
+    // Total de veículos
+    document.getElementById('total-veiculos').textContent = dados.length;
+    
+    // Média geral (apenas veículos com dados válidos)
+    const mediaGeral = dadosValidos.length > 0 
+        ? dadosValidos.reduce((sum, v) => sum + v.media_kml, 0) / dadosValidos.length
+        : 0;
+    document.getElementById('media-geral').textContent = mediaGeral.toFixed(2);
+    
+    // Gasto total
+    const gastoTotal = dados.reduce((sum, v) => sum + (v.total_gasto || 0), 0);
+    document.getElementById('gasto-total').textContent = `R$ ${gastoTotal.toFixed(2)}`;
+    
+    // Melhor consumo
+    const melhorConsumo = dadosValidos.length > 0
+        ? Math.max(...dadosValidos.map(v => v.media_kml))
+        : 0;
+    document.getElementById('melhor-consumo').textContent = melhorConsumo.toFixed(2);
+}
+
+function mostrarDetalhes(placa) {
+    const veiculo = dadosMedias.find(v => v.placa === placa);
+    if (!veiculo) return;
+
+    // Preencher modal
+    document.getElementById('modalTitulo').textContent = `Veículo: ${placa}`;
+    document.getElementById('detalhePlaca').textContent = placa;
+    document.getElementById('detalheKmAtual').textContent = veiculo.km_atual ? veiculo.km_atual.toFixed(1) + ' KM' : '-';
+    document.getElementById('detalheTotalAbastecimentos').textContent = veiculo.total_abastecimentos;
+    document.getElementById('detalheMediaKml').textContent = veiculo.media_kml ? veiculo.media_kml.toFixed(2) + ' KM/L' : '-';
+    document.getElementById('detalheMediaLitros').textContent = veiculo.media_litros ? veiculo.media_litros.toFixed(2) + ' L' : '-';
+    document.getElementById('detalheGastoTotal').textContent = veiculo.total_gasto ? `R$ ${veiculo.total_gasto.toFixed(2)}` : 'R$ 0,00';
+    
+    const status = veiculo.km_atual && veiculo.km_atual > 0;
+    document.getElementById('detalheStatus').textContent = status ? 'Ativo' : 'Inativo';
+    document.getElementById('detalheStatus').className = status ? 'badge bg-success' : 'badge bg-secondary';
+
+    // Carregar histórico (simulado - você precisaria implementar esta função)
+    carregarHistoricoVeiculo(placa);
+
+    // Abrir modal
+    new bootstrap.Modal(document.getElementById('detalhesModal')).show();
+}
+
+function carregarHistoricoVeiculo(placa) {
+    // Simulação - você precisaria implementar uma API para isso
+    const historicoHtml = `
+        <tr>
+            <td>15/01/2024</td>
+            <td class="text-end">45.2 L</td>
+            <td class="text-end">9.8 KM/L</td>
+            <td class="text-end">R$ 265,80</td>
+        </tr>
+        <tr>
+            <td>10/01/2024</td>
+            <td class="text-end">38.5 L</td>
+            <td class="text-end">10.2 KM/L</td>
+            <td class="text-end">R$ 226,50</td>
+        </tr>
+        <tr>
+            <td>05/01/2024</td>
+            <td class="text-end">42.1 L</td>
+            <td class="text-end">9.5 KM/L</td>
+            <td class="text-end">R$ 247,80</td>
+        </tr>
+    `;
+    document.getElementById('detalheHistorico').innerHTML = historicoHtml;
+}
+
+function verRelatorioVeiculo() {
+    const placa = document.getElementById('detalhePlaca').textContent;
+    // Redirecionar para relatórios com filtro da placa
+    window.location.href = `/relatorios?placa=${placa}`;
+}
+
+function atualizarDados() {
+    document.getElementById('corpoTabela').innerHTML = `
+        <tr>
+            <td colspan="6" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2">Atualizando dados...</p>
+            </td>
+        </tr>
+    `;
+    
+    setTimeout(() => {
+        carregarDados();
+        showAlert('Dados atualizados com sucesso!', 'success');
+    }, 1000);
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.navbar').nextElementSibling);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+</script>
+
+<style>
+.grafico-container {
+    position: relative;
+    height: 300px;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.badge {
+    font-size: 0.85em;
+}
+</style>
 {% endblock %}

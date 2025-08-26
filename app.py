@@ -1,14 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 import pandas as pd
 import os
-from werkzeug.utils import secure_filename
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime
-from database import (
-    criar_tabelas,
-    importar_dados,
+from database import ( 
+    criar_tabelas, 
     obter_relatorio,
     calcular_medias_veiculos,
     obter_precos_combustivel,
@@ -18,21 +16,16 @@ from database import (
     obter_opcoes_filtro,
     excluir_registro,
     atualizar_registro,
-    criar_registro
+    criar_registro,
+    obter_registro_por_id
 )
 
 app = Flask(__name__)
 app.secret_key = 'sua_chave_secreta_aqui_123'
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['ALLOWED_EXTENSIONS'] = {'xlsx', 'csv'}
 app.config['STATIC_FOLDER'] = 'static'
 
 # Configuração de pastas
-for folder in [app.config['UPLOAD_FOLDER'], app.config['STATIC_FOLDER']]:
-    os.makedirs(folder, exist_ok=True)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+os.makedirs(app.config['STATIC_FOLDER'], exist_ok=True)
 
 def gerar_grafico(df, x_col, y_cols, title, tipo='bar', filename='grafico.png'):
     plt.figure(figsize=(10, 5))
@@ -57,58 +50,21 @@ def gerar_grafico(df, x_col, y_cols, title, tipo='bar', filename='grafico.png'):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
-
-@app.route('/importar', methods=['GET', 'POST'])
-def importar():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('Nenhum arquivo enviado', 'danger')
-            return redirect(request.url)
-        
-        file = request.files['file']
-        
-        if file.filename == '':
-            flash('Nenhum arquivo selecionado', 'warning')
-            return redirect(request.url)
-        
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            try:
-                if filename.endswith('.xlsx'):
-                    df = pd.read_excel(filepath, engine='openpyxl')
-                else:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        first_line = f.readline()
-                        delimiter = ';' if ';' in first_line else ','
-                    df = pd.read_csv(filepath, encoding='utf-8', delimiter=delimiter)
-                
-                importar_dados(df)
-                flash('Dados importados com sucesso!', 'success')
-            except Exception as e:
-                flash(f'Erro ao importar arquivo: {str(e)}', 'danger')
-            finally:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-            
-            return redirect(url_for('index'))
-        
-        flash('Tipo de arquivo não permitido. Use .xlsx ou .csv', 'danger')
-    
-    return render_template('importar.html')
+    return render_template('index.html', active_page='index')
 
 @app.route('/relatorios', methods=['GET', 'POST'])
 def relatorios():
+    # Obter preços de combustível
+    precos_combustivel = obter_precos_combustivel()
+    
     if request.method == 'POST':
         filtros = {
             'data_inicio': request.form.get('data_inicio', '2023-01-01'),
             'data_fim': request.form.get('data_fim', datetime.now().strftime('%Y-%m-%d')),
             'placa': request.form.get('placa', '').strip() or None,
             'centro_custo': request.form.get('centro_custo', '').strip() or None,
-            'combustivel': request.form.get('combustivel', '').strip() or None
+            'combustivel': request.form.get('combustivel', '').strip() or None,
+            'posto': request.form.get('posto', '').strip() or None
         }
         
         try:
@@ -127,22 +83,46 @@ def relatorios():
                 dados=df.to_dict('records'),
                 filtros=filtros,
                 opcoes_centro_custo=obter_opcoes_filtro('centro_custo'),
-                opcoes_combustivel=obter_opcoes_filtro('combustivel')
+                opcoes_combustivel=obter_opcoes_filtro('combustivel'),
+                opcoes_posto=obter_opcoes_filtro('posto'),
+                precos_combustivel=precos_combustivel,
+                active_page='relatorios'
             )
         except Exception as e:
             flash(f'Erro ao gerar relatório: {str(e)}', 'danger')
+            return render_template('relatorios.html',
+                                 opcoes_centro_custo=obter_opcoes_filtro('centro_custo'),
+                                 opcoes_combustivel=obter_opcoes_filtro('combustivel'),
+                                 opcoes_posto=obter_opcoes_filtro('posto'),
+                                 precos_combustivel=precos_combustivel,
+                                 active_page='relatorios')
     
     return render_template('relatorios.html',
                          opcoes_centro_custo=obter_opcoes_filtro('centro_custo'),
-                         opcoes_combustivel=obter_opcoes_filtro('combustivel'))
+                         opcoes_combustivel=obter_opcoes_filtro('combustivel'),
+                         opcoes_posto=obter_opcoes_filtro('posto'),
+                         precos_combustivel=precos_combustivel,
+                         active_page='relatorios')
 
 @app.route('/medias-veiculos')
 def medias_veiculos():
-    dados = calcular_medias_veiculos()
-    df = pd.DataFrame(dados)
-    if not df.empty:
-        gerar_grafico(df, 'placa', ['media_kml'], 'Média de KM/L por Veículo', 'bar', 'grafico_kml.png')
-    return render_template('medias_veiculos.html', dados=dados)
+    try:
+        dados = calcular_medias_veiculos()
+        df = pd.DataFrame(dados)
+        if not df.empty:
+            gerar_grafico(df, 'placa', ['media_kml'], 'Média de KM/L por Veículo', 'bar', 'grafico_kml.png')
+        return render_template('medias_veiculos.html', dados=dados, active_page='medias')
+    except Exception as e:
+        flash(f'Erro ao calcular médias: {str(e)}', 'danger')
+        return render_template('medias_veiculos.html', dados=[], active_page='medias')
+
+@app.route('/medias-veiculos-dados')
+def medias_veiculos_dados():
+    try:
+        dados = calcular_medias_veiculos()
+        return jsonify(dados)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/integracao-atheris', methods=['GET', 'POST'])
 def integracao_atheris():
@@ -156,18 +136,28 @@ def integracao_atheris():
                 0
             )
             
+            # Obter o preço informado pelo usuário ou usar o padrão
+            custo_por_litro = request.form.get('custo_por_litro', preco_padrao)
+            
+            # Calcular valores com arredondamento para 2 casas decimais
+            litros = float(request.form.get('litros'))
+            desconto = float(request.form.get('desconto', 0))
+            custo_bruto = round(litros * float(custo_por_litro), 2)
+            custo_liquido = round(custo_bruto - desconto, 2)
+            
             dados = {
                 'data': request.form.get('data'),
                 'placa': request.form.get('placa'),
                 'responsavel': request.form.get('responsavel'),
-                'litros': request.form.get('litros'),
-                'desconto': request.form.get('desconto', 0),
-                'odometro': request.form.get('odometro', 0),
+                'litros': litros,
+                'desconto': desconto,
+                'odometro': request.form.get('odometro'),
                 'centro_custo': request.form.get('centro_custo'),
                 'combustivel': combustivel_selecionado,
-                'custo_por_litro': request.form.get('custo_por_litro', preco_padrao),
-                'custo_bruto': float(request.form.get('litros')) * float(request.form.get('custo_por_litro', preco_padrao)),
-                'custo_liquido': (float(request.form.get('litros')) * float(request.form.get('custo_por_litro', preco_padrao))) - float(request.form.get('desconto', 0))
+                'custo_por_litro': float(custo_por_litro),
+                'custo_bruto': custo_bruto,
+                'custo_liquido': custo_liquido,
+                'posto': request.form.get('posto', '')
             }
             
             if criar_abastecimento_atheris(dados):
@@ -179,7 +169,7 @@ def integracao_atheris():
         
         return redirect(url_for('integracao_atheris'))
     
-    return render_template('integracao_atheris.html', precos=precos)
+    return render_template('integracao_atheris.html', precos=precos, active_page='atheris')
 
 @app.route('/reajuste-combustiveis', methods=['GET', 'POST'])
 def reajuste_combustiveis():
@@ -209,30 +199,78 @@ def reajuste_combustiveis():
         return redirect(url_for('reajuste_combustiveis'))
     
     precos = obter_precos_combustivel()
-    return render_template('reajuste_combustiveis.html', precos=precos)
+    return render_template('reajuste_combustiveis.html', precos=precos, active_page='combustiveis')
 
 @app.route('/api/registros', methods=['POST'])
 def criar_registro_api():
-    dados = request.get_json()
     try:
-        criar_registro(dados)
-        return jsonify({'success': True})
+        dados = request.get_json()
+        
+        # Validar dados obrigatórios
+        if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel'), 
+                   dados.get('litros'), dados.get('custo_por_litro')]):
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+        
+        # Calcular valores com arredondamento
+        litros = float(dados['litros'])
+        custo_por_litro = float(dados['custo_por_litro'])
+        desconto = float(dados.get('desconto', 0))
+        
+        custo_bruto = round(litros * custo_por_litro, 2)
+        custo_liquido = round(custo_bruto - desconto, 2)
+        
+        # Adicionar valores calculados
+        dados['custo_bruto'] = custo_bruto
+        dados['custo_liquido'] = custo_liquido
+        
+        id = criar_registro(dados)
+        return jsonify({'success': True, 'id': id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/api/registros/<int:id>', methods=['PUT', 'DELETE'])
+@app.route('/api/registros/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 def gerenciar_registro(id):
-    if request.method == 'PUT':
-        dados = request.get_json()
+    if request.method == 'GET':
         try:
-            atualizar_registro(id, dados)
-            return jsonify({'success': True})
+            registro = obter_registro_por_id(id)
+            if registro:
+                return jsonify({'success': True, 'data': registro})
+            return jsonify({'success': False, 'error': 'Registro não encontrado'}), 404
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
+            
+    elif request.method == 'PUT':
+        try:
+            dados = request.get_json()
+            
+            # Validar dados obrigatórios
+            if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel'), 
+                       dados.get('litros'), dados.get('custo_por_litro')]):
+                return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+            
+            # Calcular valores com arredondamento
+            litros = float(dados['litros'])
+            custo_por_litro = float(dados['custo_por_litro'])
+            desconto = float(dados.get('desconto', 0))
+            
+            custo_bruto = round(litros * custo_por_litro, 2)
+            custo_liquido = round(custo_bruto - desconto, 2)
+            
+            # Adicionar valores calculados
+            dados['custo_bruto'] = custo_bruto
+            dados['custo_liquido'] = custo_liquido
+            
+            if atualizar_registro(id, dados):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Nenhum registro atualizado'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+            
     elif request.method == 'DELETE':
         try:
-            excluir_registro(id)
-            return jsonify({'success': True})
+            if excluir_registro(id):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Nenhum registro excluído'}), 404
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
 
@@ -246,4 +284,4 @@ def inject_now():
 
 if __name__ == '__main__':
     criar_tabelas()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
