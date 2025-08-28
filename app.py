@@ -124,52 +124,93 @@ def medias_veiculos_dados():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/integracao-atheris', methods=['GET', 'POST'])
-def integracao_atheris():
-    precos = obter_precos_combustivel()
-    
+@app.route('/metricas-uso', methods=['GET', 'POST'])
+def metricas_uso():
+    """Página de métricas de uso e controle de troca de óleo"""
     if request.method == 'POST':
         try:
-            combustivel_selecionado = request.form.get('combustivel')
-            preco_padrao = next(
-                (p['preco'] for p in precos if p['combustivel'] == combustivel_selecionado),
-                0
-            )
+            placa = request.form.get('placa').upper()
+            data_troca = request.form.get('data_troca')
+            km_troca = float(request.form.get('km_troca'))
+            proxima_troca_km = km_troca + 10000
             
-            # Obter o preço informado pelo usuário ou usar o padrão
-            custo_por_litro = request.form.get('custo_por_litro', preco_padrao)
+            # Salvar/atualizar dados de troca de óleo
+            conn = sqlite3.connect('abastecimentos.db')
+            cursor = conn.cursor()
             
-            # Calcular valores com arredondamento para 2 casas decimais
-            litros = float(request.form.get('litros'))
-            desconto = float(request.form.get('desconto', 0))
-            custo_bruto = round(litros * float(custo_por_litro), 2)
-            custo_liquido = round(custo_bruto - desconto, 2)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trocas_oleo (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    placa TEXT NOT NULL,
+                    data_troca TEXT NOT NULL,
+                    km_troca REAL NOT NULL,
+                    proxima_troca_km REAL NOT NULL,
+                    data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
             
-            dados = {
-                'data': request.form.get('data'),
-                'placa': request.form.get('placa'),
-                'responsavel': request.form.get('responsavel'),
-                'litros': litros,
-                'desconto': desconto,
-                'odometro': request.form.get('odometro'),
-                'centro_custo': request.form.get('centro_custo'),
-                'combustivel': combustivel_selecionado,
-                'custo_por_litro': float(custo_por_litro),
-                'custo_bruto': custo_bruto,
-                'custo_liquido': custo_liquido,
-                'posto': request.form.get('posto', '')
-            }
+            # Verificar se já existe registro para esta placa
+            cursor.execute('SELECT id FROM trocas_oleo WHERE placa = ?', (placa,))
+            existing = cursor.fetchone()
             
-            if criar_abastecimento_atheris(dados):
-                flash('Abastecimento registrado com sucesso via Atheris!', 'success')
+            if existing:
+                cursor.execute('''
+                    UPDATE trocas_oleo 
+                    SET data_troca = ?, km_troca = ?, proxima_troca_km = ?
+                    WHERE placa = ?
+                ''', (data_troca, km_troca, proxima_troca_km, placa))
             else:
-                flash('Erro ao registrar abastecimento', 'danger')
+                cursor.execute('''
+                    INSERT INTO trocas_oleo (placa, data_troca, km_troca, proxima_troca_km)
+                    VALUES (?, ?, ?, ?)
+                ''', (placa, data_troca, km_troca, proxima_troca_km))
+            
+            conn.commit()
+            conn.close()
+            
+            flash('Dados de troca de óleo salvos com sucesso!', 'success')
+            
         except Exception as e:
-            flash(f'Erro no processamento: {str(e)}', 'danger')
+            flash(f'Erro ao salvar dados: {str(e)}', 'danger')
         
-        return redirect(url_for('integracao_atheris'))
+        return redirect(url_for('metricas_uso'))
     
-    return render_template('integracao_atheris.html', precos=precos, active_page='atheris')
+    # Obter dados para exibição
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    # Obter últimas trocas de óleo
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT t.placa, t.data_troca, t.km_troca, t.proxima_troca_km,
+               MAX(a.odometro) as km_atual,
+               (t.proxima_troca_km - MAX(a.odometro)) as km_remanescentes
+        FROM trocas_oleo t
+        LEFT JOIN abastecimentos a ON t.placa = a.placa
+        GROUP BY t.placa
+        ORDER BY km_remanescentes ASC
+    ''')
+    
+    trocas_oleo = []
+    for row in cursor.fetchall():
+        trocas_oleo.append({
+            'placa': row[0],
+            'data_troca': row[1],
+            'km_troca': row[2],
+            'proxima_troca_km': row[3],
+            'km_atual': row[4] if row[4] else row[2],  # Se não há abastecimento, usa km_troca
+            'km_remanescentes': row[5] if row[5] is not None else (row[3] - row[2])
+        })
+    
+    # Obter placas disponíveis
+    cursor.execute("SELECT DISTINCT placa FROM abastecimentos WHERE placa IS NOT NULL ORDER BY placa")
+    placas = [row[0] for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    return render_template('metricas_uso.html', 
+                         trocas_oleo=trocas_oleo,
+                         placas=placas,
+                         active_page='metricas')
 
 @app.route('/reajuste-combustiveis', methods=['GET', 'POST'])
 def reajuste_combustiveis():

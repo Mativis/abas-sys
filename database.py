@@ -40,6 +40,18 @@ def criar_tabelas():
     )
     ''')
     
+    # Tabela de trocas de óleo (NOVA)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS trocas_oleo (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        placa TEXT NOT NULL,
+        data_troca TEXT NOT NULL,
+        km_troca REAL NOT NULL,
+        proxima_troca_km REAL NOT NULL,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
     # Valores padrão para combustíveis
     cursor.execute("SELECT COUNT(*) FROM precos_combustivel")
     if cursor.fetchone()[0] == 0:
@@ -440,5 +452,89 @@ def criar_registro(dados):
     except Exception as e:
         conn.close()
         raise e
+    finally:
+        conn.close()
+
+def obter_trocas_oleo():
+    """Obtém todas as trocas de óleo com informações de KM atual"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    query = """
+    SELECT t.placa, t.data_troca, t.km_troca, t.proxima_troca_km,
+           MAX(a.odometro) as km_atual,
+           (t.proxima_troca_km - MAX(a.odometro)) as km_remanescentes
+    FROM trocas_oleo t
+    LEFT JOIN abastecimentos a ON t.placa = a.placa
+    GROUP BY t.placa
+    ORDER BY km_remanescentes ASC
+    """
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+        
+        trocas = []
+        for row in resultados:
+            trocas.append({
+                'placa': row[0],
+                'data_troca': row[1],
+                'km_troca': row[2],
+                'proxima_troca_km': row[3],
+                'km_atual': row[4] if row[4] else row[2],  # Se não há abastecimento, usa km_troca
+                'km_remanescentes': row[5] if row[5] is not None else (row[3] - row[2])
+            })
+        
+        return trocas
+    except Exception as e:
+        print(f"Erro ao obter trocas de óleo: {e}")
+        return []
+    finally:
+        conn.close()
+
+def salvar_troca_oleo(placa, data_troca, km_troca):
+    """Salva ou atualiza dados de troca de óleo"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    try:
+        proxima_troca_km = km_troca + 10000
+        
+        # Verificar se já existe registro para esta placa
+        cursor.execute('SELECT id FROM trocas_oleo WHERE placa = ?', (placa,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            cursor.execute('''
+                UPDATE trocas_oleo 
+                SET data_troca = ?, km_troca = ?, proxima_troca_km = ?
+                WHERE placa = ?
+            ''', (data_troca, km_troca, proxima_troca_km, placa))
+        else:
+            cursor.execute('''
+                INSERT INTO trocas_oleo (placa, data_troca, km_troca, proxima_troca_km)
+                VALUES (?, ?, ?, ?)
+            ''', (placa, data_troca, km_troca, proxima_troca_km))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar troca de óleo: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_placas_veiculos():
+    """Obtém todas as placas de veículos cadastradas"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT placa FROM abastecimentos WHERE placa IS NOT NULL ORDER BY placa")
+        placas = [row[0] for row in cursor.fetchall()]
+        return placas
+    except Exception as e:
+        print(f"Erro ao obter placas: {e}")
+        return []
     finally:
         conn.close()
