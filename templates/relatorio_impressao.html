@@ -160,6 +160,14 @@
         .quebrapagina {
             page-break-after: always;
         }
+
+        /* Estilos para as novas colunas */
+        .col-valor {
+            min-width: 80px;
+        }
+        .col-desconto {
+            min-width: 70px;
+        }
     </style>
 </head>
 <body>
@@ -189,7 +197,9 @@
                 <th class="text-right">Litros</th>
                 <th class="text-right">Odômetro</th>
                 <th class="text-right">KM/L</th>
-                <th class="text-right">Valor liquído (R$)</th>
+                <th class="text-right col-valor">Valor Bruto (R$)</th>
+                <th class="text-right col-desconto">Desconto (R$)</th>
+                <th class="text-right col-valor">Valor Líquido (R$)</th>
             </tr>
         </thead>
         <tbody>
@@ -203,6 +213,8 @@
                 <td class="text-right">{{ "%.3f"|format(item.litros) }}</td>
                 <td class="text-right">{{ "%.1f"|format(item.odometro) if item.odometro else '-' }}</td>
                 <td class="text-right">{{ "%.2f"|format(item.km_litro) if item.km_litro else '-' }}</td>
+                <td class="text-right">{{ "%.2f"|format(item.custo_bruto) }}</td>
+                <td class="text-right">{{ "%.2f"|format(item.desconto) if item.desconto else '0,00' }}</td>
                 <td class="text-right">{{ "%.2f"|format(item.custo_liquido) }}</td>
             </tr>
             {% endfor %}
@@ -212,7 +224,15 @@
                 <td colspan="5">TOTAL</td>
                 <td class="text-right">{{ "%.3f"|format(dados|sum(attribute='litros')) }}</td>
                 <td colspan="2"></td>
+                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto')) }}</td>
+                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='desconto')) }}</td>
                 <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="8">MÉDIA POR ABASTECIMENTO</td>
+                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto') / dados|length) if dados|length > 0 else '0,00' }}</td>
+                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='desconto') / dados|length) if dados|length > 0 else '0,00' }}</td>
+                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido') / dados|length) if dados|length > 0 else '0,00' }}</td>
             </tr>
         </tfoot>
     </table>
@@ -225,7 +245,13 @@
             <strong>Total Litros:</strong> {{ "%.3f"|format(dados|sum(attribute='litros')) }} L
         </div>
         <div class="resumo-item">
-            <strong>Total Valor:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}
+            <strong>Valor Bruto Total:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto')) }}
+        </div>
+        <div class="resumo-item">
+            <strong>Desconto Total:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='desconto')) }}
+        </div>
+        <div class="resumo-item">
+            <strong>Valor Líquido Total:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}
         </div>
         <div class="resumo-item">
             <strong>Postos Diferentes:</strong> {{ dados|map(attribute='posto')|unique|list|length }}
