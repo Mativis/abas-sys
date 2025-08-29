@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 import pandas as pd
 import os
-import sqlite3    
+import sqlite3
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import ( 
     criar_tabelas, 
     obter_relatorio,
@@ -18,7 +18,10 @@ from database import (
     excluir_registro,
     atualizar_registro,
     criar_registro,
-    obter_registro_por_id
+    obter_registro_por_id,
+    obter_trocas_oleo,
+    salvar_troca_oleo,
+    obter_placas_veiculos
 )
 
 app = Flask(__name__)
@@ -51,7 +54,42 @@ def gerar_grafico(df, x_col, y_cols, title, tipo='bar', filename='grafico.png'):
 
 @app.route('/')
 def index():
-    return render_template('index.html', active_page='index')
+    # Calcular estatísticas para o dashboard
+    try:
+        # Total de abastecimentos
+        conn = sqlite3.connect('abastecimentos.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM abastecimentos")
+        total_abastecimentos = cursor.fetchone()[0]
+        
+        # Total de veículos
+        cursor.execute("SELECT COUNT(DISTINCT placa) FROM abastecimentos")
+        total_veiculos = cursor.fetchone()[0]
+        
+        # Total de manutenções
+        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        total_manutencoes = cursor.fetchone()[0]
+        
+        # Gasto total
+        cursor.execute("SELECT SUM(custo_liquido) FROM abastecimentos")
+        gasto_total = cursor.fetchone()[0] or 0
+        
+        conn.close()
+        
+        return render_template('index.html', 
+                             active_page='index',
+                             total_abastecimentos=total_abastecimentos,
+                             total_veiculos=total_veiculos,
+                             total_manutencoes=total_manutencoes,
+                             gasto_total=gasto_total)
+    except Exception as e:
+        print(f"Erro ao carregar dados do dashboard: {e}")
+        return render_template('index.html', 
+                             active_page='index',
+                             total_abastecimentos=0,
+                             total_veiculos=0,
+                             total_manutencoes=0,
+                             gasto_total=0)
 
 @app.route('/relatorios', methods=['GET', 'POST'])
 def relatorios():
@@ -105,6 +143,198 @@ def relatorios():
                          precos_combustivel=precos_combustivel,
                          active_page='relatorios')
 
+@app.route('/manutencoes')
+def manutencoes():
+    """Página de gerenciamento de manutenções"""
+    try:
+        # Verificar se a tabela de manutenções existe e criar se não existir
+        conn = sqlite3.connect('abastecimentos.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='manutencoes'
+        ''')
+        
+        if not cursor.fetchone():
+            # Criar tabela se não existir
+            cursor.execute('''
+                CREATE TABLE manutencoes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    identificacao TEXT NOT NULL,
+                    tipo TEXT NOT NULL,
+                    frota TEXT NOT NULL,
+                    descricao TEXT NOT NULL,
+                    fornecedor TEXT,
+                    valor REAL DEFAULT 0,
+                    data_abertura TEXT NOT NULL,
+                    previsao_conclusao TEXT,
+                    data_conclusao TEXT,
+                    observacoes TEXT,
+                    finalizada BOOLEAN DEFAULT 0,
+                    data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+        
+        # Buscar manutenções
+        query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
+        df = pd.read_sql(query, conn)
+        manutencoes = df.to_dict('records')
+        
+        # Estatísticas para a página
+        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        total_manutencoes = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 0")
+        manutencoes_abertas = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 1")
+        manutencoes_finalizadas = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT SUM(valor) FROM manutencoes")
+        valor_total = cursor.fetchone()[0] or 0
+        
+        conn.close()
+        
+        return render_template('manutencoes.html', 
+                             active_page='manutencoes',
+                             manutencoes=manutencoes,
+                             total_manutencoes=total_manutencoes,
+                             manutencoes_abertas=manutencoes_abertas,
+                             manutencoes_finalizadas=manutencoes_finalizadas,
+                             valor_total=valor_total)
+    except Exception as e:
+        flash(f'Erro ao carregar manutenções: {str(e)}', 'danger')
+        return render_template('manutencoes.html', 
+                             active_page='manutencoes',
+                             manutencoes=[],
+                             total_manutencoes=0,
+                             manutencoes_abertas=0,
+                             manutencoes_finalizadas=0,
+                             valor_total=0)
+
+@app.route('/api/manutencoes', methods=['GET', 'POST'])
+def api_manutencoes():
+    """API para gerenciar manutenções"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    if request.method == 'GET':
+        # Retornar lista de manutenções
+        try:
+            query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
+            df = pd.read_sql(query, conn)
+            conn.close()
+            return jsonify(df.to_dict('records'))
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        # Criar nova manutenção
+        dados = request.get_json()
+        
+        query = '''
+            INSERT INTO manutencoes 
+            (identificacao, tipo, frota, descricao, fornecedor, valor, 
+             data_abertura, previsao_conclusao, data_conclusao, observacoes, finalizada)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        '''
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, (
+                dados['identificacao'],
+                dados['tipo'],
+                dados['frota'],
+                dados['descricao'],
+                dados.get('fornecedor', ''),
+                dados.get('valor', 0),
+                dados['data_abertura'],
+                dados.get('previsao_conclusao', ''),
+                dados.get('data_conclusao', ''),
+                dados.get('observacoes', ''),
+                dados.get('finalizada', False)
+            ))
+            conn.commit()
+            manutencao_id = cursor.lastrowid
+            conn.close()
+            
+            return jsonify({'success': True, 'id': manutencao_id})
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/manutencoes/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+def api_manutencao(id):
+    """API para gerenciar uma manutenção específica"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    if request.method == 'GET':
+        # Buscar manutenção específica
+        try:
+            query = "SELECT * FROM manutencoes WHERE id = ?"
+            df = pd.read_sql(query, conn, params=(id,))
+            conn.close()
+            
+            if not df.empty:
+                return jsonify(df.iloc[0].to_dict())
+            return jsonify({'error': 'Manutenção não encontrada'}), 404
+        except Exception as e:
+            conn.close()
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'PUT':
+        # Atualizar manutenção
+        dados = request.get_json()
+        
+        query = '''
+            UPDATE manutencoes SET
+                identificacao = ?, tipo = ?, frota = ?, descricao = ?, 
+                fornecedor = ?, valor = ?, data_abertura = ?, 
+                previsao_conclusao = ?, data_conclusao = ?, 
+                observacoes = ?, finalizada = ?
+            WHERE id = ?
+        '''
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, (
+                dados['identificacao'],
+                dados['tipo'],
+                dados['frota'],
+                dados['descricao'],
+                dados.get('fornecedor', ''),
+                dados.get('valor', 0),
+                dados['data_abertura'],
+                dados.get('previsao_conclusao', ''),
+                dados.get('data_conclusao', ''),
+                dados.get('observacoes', ''),
+                dados.get('finalizada', False),
+                id
+            ))
+            conn.commit()
+            conn.close()
+            
+            return jsonify({'success': True})
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 400
+    
+    elif request.method == 'DELETE':
+        # Excluir manutenção
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM manutencoes WHERE id = ?", (id,))
+            conn.commit()
+            conn.close()
+            
+            if cursor.rowcount > 0:
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Manutenção não encontrada'}), 404
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 400
+
 @app.route('/medias-veiculos')
 def medias_veiculos():
     try:
@@ -133,43 +363,11 @@ def metricas_uso():
             placa = request.form.get('placa').upper()
             data_troca = request.form.get('data_troca')
             km_troca = float(request.form.get('km_troca'))
-            proxima_troca_km = km_troca + 10000
             
-            # Salvar/atualizar dados de troca de óleo
-            conn = sqlite3.connect('abastecimentos.db')
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS trocas_oleo (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    placa TEXT NOT NULL,
-                    data_troca TEXT NOT NULL,
-                    km_troca REAL NOT NULL,
-                    proxima_troca_km REAL NOT NULL,
-                    data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Verificar se já existe registro para esta placa
-            cursor.execute('SELECT id FROM trocas_oleo WHERE placa = ?', (placa,))
-            existing = cursor.fetchone()
-            
-            if existing:
-                cursor.execute('''
-                    UPDATE trocas_oleo 
-                    SET data_troca = ?, km_troca = ?, proxima_troca_km = ?
-                    WHERE placa = ?
-                ''', (data_troca, km_troca, proxima_troca_km, placa))
+            if salvar_troca_oleo(placa, data_troca, km_troca):
+                flash('Dados de troca de óleo salvos com sucesso!', 'success')
             else:
-                cursor.execute('''
-                    INSERT INTO trocas_oleo (placa, data_troca, km_troca, proxima_troca_km)
-                    VALUES (?, ?, ?, ?)
-                ''', (placa, data_troca, km_troca, proxima_troca_km))
-            
-            conn.commit()
-            conn.close()
-            
-            flash('Dados de troca de óleo salvos com sucesso!', 'success')
+                flash('Erro ao salvar dados de troca de óleo', 'danger')
             
         except Exception as e:
             flash(f'Erro ao salvar dados: {str(e)}', 'danger')
@@ -177,36 +375,8 @@ def metricas_uso():
         return redirect(url_for('metricas_uso'))
     
     # Obter dados para exibição
-    conn = sqlite3.connect('abastecimentos.db')
-    
-    # Obter últimas trocas de óleo
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT t.placa, t.data_troca, t.km_troca, t.proxima_troca_km,
-               MAX(a.odometro) as km_atual,
-               (t.proxima_troca_km - MAX(a.odometro)) as km_remanescentes
-        FROM trocas_oleo t
-        LEFT JOIN abastecimentos a ON t.placa = a.placa
-        GROUP BY t.placa
-        ORDER BY km_remanescentes ASC
-    ''')
-    
-    trocas_oleo = []
-    for row in cursor.fetchall():
-        trocas_oleo.append({
-            'placa': row[0],
-            'data_troca': row[1],
-            'km_troca': row[2],
-            'proxima_troca_km': row[3],
-            'km_atual': row[4] if row[4] else row[2],  # Se não há abastecimento, usa km_troca
-            'km_remanescentes': row[5] if row[5] is not None else (row[3] - row[2])
-        })
-    
-    # Obter placas disponíveis
-    cursor.execute("SELECT DISTINCT placa FROM abastecimentos WHERE placa IS NOT NULL ORDER BY placa")
-    placas = [row[0] for row in cursor.fetchall()]
-    
-    conn.close()
+    trocas_oleo = obter_trocas_oleo()
+    placas = obter_placas_veiculos()
     
     return render_template('metricas_uso.html', 
                          trocas_oleo=trocas_oleo,

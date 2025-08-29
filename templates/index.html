@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-plus-circle display-4 text-primary mb-3"></i>
@@ -14,7 +14,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-graph-up display-4 text-success mb-3"></i>
@@ -26,47 +26,124 @@
             </div>
         </div>
     </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-tools display-4 text-info mb-3"></i>
+                <h3>Manutenções</h3>
+                <p>Controle de manutenções da frota</p>
+                <a href="/manutencoes" class="btn btn-info">
+                    <i class="bi bi-tools"></i> Gerenciar
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row mt-4">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <i class="bi bi-speedometer2 display-4 text-info mb-3"></i>
+                <i class="bi bi-speedometer2 display-4 text-warning mb-3"></i>
                 <h3>Médias de Consumo</h3>
                 <p>Veja as médias de consumo por veículo</p>
-                <a href="/medias-veiculos" class="btn btn-info">
+                <a href="/medias-veiculos" class="btn btn-warning">
                     <i class="bi bi-speedometer2"></i> Ver Médias
                 </a>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <i class="bi bi-speedometer display-4 text-warning mb-3"></i>
+                <i class="bi bi-speedometer display-4 text-danger mb-3"></i>
                 <h3>Métricas de Uso</h3>
-                <p>Controle de troca de óleo e manutenção (Coming soon)</p>
-                <a href="/metricas-uso" class="btn btn-warning">
+                <p>Controle de troca de óleo e manutenção</p>
+                <a href="/metricas-uso" class="btn btn-danger">
                     <i class="bi bi-speedometer"></i> Ver Métricas
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-fuel-pump display-4 text-secondary mb-3"></i>
+                <h3>Combustíveis</h3>
+                <p>Gerencie os preços dos combustíveis</p>
+                <a href="/reajuste-combustiveis" class="btn btn-secondary">
+                    <i class="bi bi-fuel-pump"></i> Gerenciar
                 </a>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Dashboard Resumido -->
 <div class="row mt-4">
-    <div class="col-md-6">
+    <div class="col-12">
         <div class="card">
-            <div class="card-body text-center">
-                <i class="bi bi-currency-dollar display-4 text-danger mb-3"></i>
-                <h3>Combustíveis</h3>
-                <p>Gerencie os preços dos combustíveis</p>
-                <a href="/reajuste-combustiveis" class="btn btn-danger">
-                    <i class="bi bi-currency-dollar"></i> Gerenciar
-                </a>
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-dashboard"></i> Resumo do Sistema
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h4 id="total-abastecimentos">0</h4>
+                        <p class="text-muted">Abastecimentos</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="total-veiculos-dash">0</h4>
+                        <p class="text-muted">Veículos</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="total-manutencoes-dash">0</h4>
+                        <p class="text-muted">Manutenções</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="gasto-total-dash">R$ 0,00</h4>
+                        <p class="text-muted">Gasto Total</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Carregar dados do dashboard ao iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    carregarDadosDashboard();
+});
+
+function carregarDadosDashboard() {
+    // Simulação de dados - em produção, isso viria de uma API
+    setTimeout(() => {
+        document.getElementById('total-abastecimentos').textContent = '156';
+        document.getElementById('total-veiculos-dash').textContent = '23';
+        document.getElementById('total-manutencoes-dash').textContent = '42';
+        document.getElementById('gasto-total-dash').textContent = 'R$ 45.678,90';
+    }, 1000);
+}
+</script>
+
+<style>
+.card {
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.display-4 {
+    font-size: 2.5rem;
+}
+
+.btn {
+    margin-top: 10px;
+}
+</style>
 {% endblock %}

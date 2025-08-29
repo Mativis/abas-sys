@@ -1,0 +1,752 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-tools"></i> Controle de Manutenções
+        </div>
+        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novaManutencaoModal">
+            <i class="bi bi-plus-circle"></i> Nova Manutenção
+        </button>
+    </div>
+    <div class="card-body">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="filtroIdentificacao" class="form-control" placeholder="Filtrar por identificação...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select id="filtroStatus" class="form-select">
+                    <option value="todos">Todos os status</option>
+                    <option value="aberto">Abertas</option>
+                    <option value="finalizado">Finalizadas</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="filtroTipo" class="form-select">
+                    <option value="todos">Todos os tipos</option>
+                    <option value="corretiva">Corretiva</option>
+                    <option value="preventiva">Preventiva</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="filtroFrota" class="form-select">
+                    <option value="todos">Todas as frotas</option>
+                    <option value="apoio">Apoio</option>
+                    <option value="maquinas">Máquinas</option>
+                    <option value="equipamento">Equipamento</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Cards de Resumo -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center bg-primary text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-tools"></i> Total</h5>
+                        <h3 id="total-manutencoes">0</h3>
+                        <small>Manutenções cadastradas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-warning text-dark">
+                    <div class="card-body">
+                        <h5><i class="bi bi-clock"></i> Abertas</h5>
+                        <h3 id="total-abertas">0</h3>
+                        <small>Manutenções em andamento</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-success text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-check-circle"></i> Finalizadas</h5>
+                        <h3 id="total-finalizadas">0</h3>
+                        <small>Manutenções concluídas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-danger text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-currency-dollar"></i> Valor Total</h5>
+                        <h3 id="valor-total">R$ 0,00</h3>
+                        <small>Total em manutenções</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Manutenções -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover" id="tabelaManutencoes">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Identificação</th>
+                        <th>Tipo</th>
+                        <th>Frota</th>
+                        <th>Descrição</th>
+                        <th>Fornecedor</th>
+                        <th class="text-end">Valor</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="corpoTabela">
+                    <tr>
+                        <td colspan="9" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                            <p class="mt-2">Carregando manutenções...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Manutenção -->
+<div class="modal fade" id="novaManutencaoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Manutenção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNovaManutencao">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Manutenção *</label>
+                            <select class="form-select" name="tipo" required>
+                                <option value="">Selecione...</option>
+                                <option value="corretiva">Corretiva</option>
+                                <option value="preventiva">Preventiva</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Frota *</label>
+                            <select class="form-select" name="frota" required>
+                                <option value="">Selecione...</option>
+                                <option value="apoio">Apoio</option>
+                                <option value="maquinas">Máquinas</option>
+                                <option value="equipamento">Equipamento</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Identificação *</label>
+                            <input type="text" class="form-control" name="identificacao" required 
+                                   placeholder="Ex: Caminhão ABC-1234, Máquina XYZ, etc.">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data de Abertura *</label>
+                            <input type="date" class="form-control" name="data_abertura" required 
+                                   value="{{ now.strftime('%Y-%m-%d') }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Previsão de Conclusão</label>
+                            <input type="date" class="form-control" name="previsao_conclusao">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Manutenção a Ser Realizada *</label>
+                            <textarea class="form-control" name="descricao" rows="3" required 
+                                      placeholder="Descreva detalhadamente a manutenção necessária..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fornecedor</label>
+                            <input type="text" class="form-control" name="fornecedor" 
+                                   placeholder="Nome do fornecedor">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Valor Orçado (R$)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" 
+                                   name="valor" placeholder="0,00">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" name="observacoes" rows="2" 
+                                      placeholder="Informações adicionais..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Manutenção -->
+<div class="modal fade" id="editarManutencaoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Manutenção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditarManutencao">
+                <input type="hidden" id="editar_id">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Manutenção *</label>
+                            <select class="form-select" id="editar_tipo" required>
+                                <option value="">Selecione...</option>
+                                <option value="corretiva">Corretiva</option>
+                                <option value="preventiva">Preventiva</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Frota *</label>
+                            <select class="form-select" id="editar_frota" required>
+                                <option value="">Selecione...</option>
+                                <option value="apoio">Apoio</option>
+                                <option value="maquinas">Máquinas</option>
+                                <option value="equipamento">Equipamento</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Identificação *</label>
+                            <input type="text" class="form-control" id="editar_identificacao" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data de Abertura *</label>
+                            <input type="date" class="form-control" id="editar_data_abertura" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data de Conclusão</label>
+                            <input type="date" class="form-control" id="editar_data_conclusao">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Previsão de Conclusão</label>
+                            <input type="date" class="form-control" id="editar_previsao_conclusao">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Manutenção a Ser Realizada *</label>
+                            <textarea class="form-control" id="editar_descricao" rows="3" required></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fornecedor</label>
+                            <input type="text" class="form-control" id="editar_fornecedor">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Valor Orçado (R$)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="editar_valor">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" id="editar_observacoes" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editar_finalizada">
+                                <label class="form-check-label" for="editar_finalizada">Manutenção Finalizada</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalhes/Impressão -->
+<div class="modal fade" id="detalhesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Manutenção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detalhesConteudo">
+                <!-- Conteúdo será preenchido via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="imprimirManutencao()">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let manutencoes = [];
+
+// Carregar dados ao iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    carregarManutencoes();
+    configurarFiltros();
+    configurarFormularios();
+});
+
+function carregarManutencoes() {
+    // Simulação de dados - em produção, isso viria de uma API
+    const dadosSimulados = [
+        {
+            id: 1,
+            identificacao: "Caminhão ABC-1234",
+            tipo: "preventiva",
+            frota: "apoio",
+            descricao: "Troca de óleo e filtros",
+            fornecedor: "Mecânica Central",
+            valor: 850.00,
+            data_abertura: "2024-01-15",
+            previsao_conclusao: "2024-01-20",
+            data_conclusao: "2024-01-18",
+            observacoes: "Veículo apresentando ruídos no motor",
+            finalizada: true
+        },
+        {
+            id: 2,
+            identificacao: "Retroescavadeira XYZ-567",
+            tipo: "corretiva",
+            frota: "maquinas",
+            descricao: "Reparo no sistema hidráulico",
+            fornecedor: "Hidráulica São João",
+            valor: 2200.50,
+            data_abertura: "2024-02-01",
+            previsao_conclusao: "2024-02-10",
+            data_conclusao: null,
+            observacoes: "Vazamento no cilindro principal",
+            finalizada: false
+        },
+        {
+            id: 3,
+            identificacao: "Compactador de Solo",
+            tipo: "preventiva",
+            frota: "equipamento",
+            descricao: "Revisão geral e lubrificação",
+            fornecedor: "Equipamentos Pesados LTDA",
+            valor: 1200.00,
+            data_abertura: "2024-01-25",
+            previsao_conclusao: "2024-02-05",
+            data_conclusao: null,
+            observacoes: "Manutenção programada trimestral",
+            finalizada: false
+        }
+    ];
+    
+    manutencoes = dadosSimulados;
+    aplicarFiltros();
+}
+
+function configurarFiltros() {
+    // Filtro de identificação
+    document.getElementById('filtroIdentificacao').addEventListener('input', aplicarFiltros);
+    
+    // Filtro de status
+    document.getElementById('filtroStatus').addEventListener('change', aplicarFiltros);
+    
+    // Filtro de tipo
+    document.getElementById('filtroTipo').addEventListener('change', aplicarFiltros);
+    
+    // Filtro de frota
+    document.getElementById('filtroFrota').addEventListener('change', aplicarFiltros);
+}
+
+function configurarFormularios() {
+    // Formulário de nova manutenção
+    document.getElementById('formNovaManutencao').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        
+        const novaManutencao = {
+            id: manutencoes.length > 0 ? Math.max(...manutencoes.map(m => m.id)) + 1 : 1,
+            identificacao: formData.get('identificacao'),
+            tipo: formData.get('tipo'),
+            frota: formData.get('frota'),
+            descricao: formData.get('descricao'),
+            fornecedor: formData.get('fornecedor'),
+            valor: parseFloat(formData.get('valor')) || 0,
+            data_abertura: formData.get('data_abertura'),
+            previsao_conclusao: formData.get('previsao_conclusao'),
+            data_conclusao: null,
+            observacoes: formData.get('observacoes'),
+            finalizada: false
+        };
+        
+        manutencoes.push(novaManutencao);
+        aplicarFiltros();
+        
+        // Fechar modal e limpar formulário
+        bootstrap.Modal.getInstance(document.getElementById('novaManutencaoModal')).hide();
+        this.reset();
+        
+        showAlert('Manutenção cadastrada com sucesso!', 'success');
+    });
+    
+    // Formulário de edição
+    document.getElementById('formEditarManutencao').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('editar_id').value);
+        
+        const manutencaoIndex = manutencoes.findIndex(m => m.id === id);
+        if (manutencaoIndex !== -1) {
+            manutencoes[manutencaoIndex] = {
+                ...manutencoes[manutencaoIndex],
+                identificacao: document.getElementById('editar_identificacao').value,
+                tipo: document.getElementById('editar_tipo').value,
+                frota: document.getElementById('editar_frota').value,
+                descricao: document.getElementById('editar_descricao').value,
+                fornecedor: document.getElementById('editar_fornecedor').value,
+                valor: parseFloat(document.getElementById('editar_valor').value) || 0,
+                data_abertura: document.getElementById('editar_data_abertura').value,
+                previsao_conclusao: document.getElementById('editar_previsao_conclusao').value,
+                data_conclusao: document.getElementById('editar_data_conclusao').value || null,
+                observacoes: document.getElementById('editar_observacoes').value,
+                finalizada: document.getElementById('editar_finalizada').checked
+            };
+            
+            aplicarFiltros();
+            bootstrap.Modal.getInstance(document.getElementById('editarManutencaoModal')).hide();
+            showAlert('Manutenção atualizada com sucesso!', 'success');
+        }
+    });
+}
+
+function aplicarFiltros() {
+    const filtroIdentificacao = document.getElementById('filtroIdentificacao').value.toLowerCase();
+    const filtroStatus = document.getElementById('filtroStatus').value;
+    const filtroTipo = document.getElementById('filtroTipo').value;
+    const filtroFrota = document.getElementById('filtroFrota').value;
+    
+    let dadosFiltrados = manutencoes.filter(manutencao => {
+        // Filtro por identificação
+        if (filtroIdentificacao && !manutencao.identificacao.toLowerCase().includes(filtroIdentificacao)) {
+            return false;
+        }
+        
+        // Filtro por status
+        if (filtroStatus !== 'todos') {
+            if (filtroStatus === 'aberto' && manutencao.finalizada) return false;
+            if (filtroStatus === 'finalizado' && !manutencao.finalizada) return false;
+        }
+        
+        // Filtro por tipo
+        if (filtroTipo !== 'todos' && manutencao.tipo !== filtroTipo) {
+            return false;
+        }
+        
+        // Filtro por frota
+        if (filtroFrota !== 'todos' && manutencao.frota !== filtroFrota) {
+            return false;
+        }
+        
+        return true;
+    });
+    
+    atualizarTabela(dadosFiltrados);
+    atualizarResumo(dadosFiltrados);
+}
+
+function atualizarTabela(dados) {
+    const tbody = document.getElementById('corpoTabela');
+    
+    if (dados.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center py-4">
+                    <i class="bi bi-inbox"></i>
+                    <p class="text-muted">Nenhuma manutenção encontrada com os filtros aplicados.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    let html = '';
+    dados.forEach(manutencao => {
+        const valorFormatado = manutencao.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const tipoFormatado = manutencao.tipo === 'corretiva' ? 'Corretiva' : 'Preventiva';
+        const frotaFormatada = {
+            'apoio': 'Apoio',
+            'maquinas': 'Máquinas',
+            'equipamento': 'Equipamento'
+        }[manutencao.frota];
+        
+        html += `
+            <tr>
+                <td>${manutencao.id}</td>
+                <td>${manutencao.identificacao}</td>
+                <td>${tipoFormatado}</td>
+                <td>${frotaFormatada}</td>
+                <td>${manutencao.descricao.substring(0, 50)}${manutencao.descricao.length > 50 ? '...' : ''}</td>
+                <td>${manutencao.fornecedor || '-'}</td>
+                <td class="text-end">${valorFormatado}</td>
+                <td class="text-center">
+                    <span class="badge ${manutencao.finalizada ? 'bg-success' : 'bg-warning'}">
+                        ${manutencao.finalizada ? 'Finalizada' : 'Em Aberto'}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-info" onclick="detalhesManutencao(${manutencao.id})" title="Detalhes">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="editarManutencao(${manutencao.id})" title="Editar">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="excluirManutencao(${manutencao.id})" title="Excluir">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function atualizarResumo(dados) {
+    const total = dados.length;
+    const abertas = dados.filter(m => !m.finalizada).length;
+    const finalizadas = dados.filter(m => m.finalizada).length;
+    const valorTotal = dados.reduce((sum, m) => sum + m.valor, 0);
+    
+    document.getElementById('total-manutencoes').textContent = total;
+    document.getElementById('total-abertas').textContent = abertas;
+    document.getElementById('total-finalizadas').textContent = finalizadas;
+    document.getElementById('valor-total').textContent = valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function editarManutencao(id) {
+    const manutencao = manutencoes.find(m => m.id === id);
+    if (!manutencao) return;
+    
+    // Preencher o formulário de edição
+    document.getElementById('editar_id').value = manutencao.id;
+    document.getElementById('editar_identificacao').value = manutencao.identificacao;
+    document.getElementById('editar_tipo').value = manutencao.tipo;
+    document.getElementById('editar_frota').value = manutencao.frota;
+    document.getElementById('editar_descricao').value = manutencao.descricao;
+    document.getElementById('editar_fornecedor').value = manutencao.fornecedor || '';
+    document.getElementById('editar_valor').value = manutencao.valor;
+    document.getElementById('editar_data_abertura').value = manutencao.data_abertura;
+    document.getElementById('editar_previsao_conclusao').value = manutencao.previsao_conclusao || '';
+    document.getElementById('editar_data_conclusao').value = manutencao.data_conclusao || '';
+    document.getElementById('editar_observacoes').value = manutencao.observacoes || '';
+    document.getElementById('editar_finalizada').checked = manutencao.finalizada;
+    
+    // Abrir o modal
+    new bootstrap.Modal(document.getElementById('editarManutencaoModal')).show();
+}
+
+function detalhesManutencao(id) {
+    const manutencao = manutencoes.find(m => m.id === id);
+    if (!manutencao) return;
+    
+    const tipoFormatado = manutencao.tipo === 'corretiva' ? 'Corretiva' : 'Preventiva';
+    const frotaFormatada = {
+        'apoio': 'Apoio',
+        'maquinas': 'Máquinas',
+        'equipamento': 'Equipamento'
+    }[manutencao.frota];
+    
+    const valorFormatado = manutencao.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    
+    const html = `
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-info-circle"></i> Informações da Manutenção
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>ID:</strong></div>
+                            <div class="col-7">${manutencao.id}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Identificação:</strong></div>
+                            <div class="col-7">${manutencao.identificacao}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Tipo:</strong></div>
+                            <div class="col-7">${tipoFormatado}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Frota:</strong></div>
+                            <div class="col-7">${frotaFormatada}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Status:</strong></div>
+                            <div class="col-7">
+                                <span class="badge ${manutencao.finalizada ? 'bg-success' : 'bg-warning'}">
+                                    ${manutencao.finalizada ? 'Finalizada' : 'Em Aberto'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-calendar"></i> Datas
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Abertura:</strong></div>
+                            <div class="col-7">${formatarData(manutencao.data_abertura)}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Previsão:</strong></div>
+                            <div class="col-7">${manutencao.previsao_conclusao ? formatarData(manutencao.previsao_conclusao) : '-'}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-5"><strong>Conclusão:</strong></div>
+                            <div class="col-7">${manutencao.data_conclusao ? formatarData(manutencao.data_conclusao) : '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-currency-dollar"></i> Financeiro
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-5"><strong>Fornecedor:</strong></div>
+                            <div class="col-7">${manutencao.fornecedor || '-'}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-5"><strong>Valor:</strong></div>
+                            <div class="col-7 fw-bold">${valorFormatado}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-card-text"></i> Descrição
+                    </div>
+                    <div class="card-body">
+                        <p>${manutencao.descricao}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        ${manutencao.observacoes ? `
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <i class="bi bi-chat"></i> Observações
+                    </div>
+                    <div class="card-body">
+                        <p>${manutencao.observacoes}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+    `;
+    
+    document.getElementById('detalhesConteudo').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('detalhesModal')).show();
+}
+
+function excluirManutencao(id) {
+    if (confirm('Tem certeza que deseja excluir esta manutenção?')) {
+        manutencoes = manutencoes.filter(m => m.id !== id);
+        aplicarFiltros();
+        showAlert('Manutenção excluída com sucesso!', 'success');
+    }
+}
+
+function imprimirManutencao() {
+    window.print();
+}
+
+function formatarData(dataString) {
+    if (!dataString) return '-';
+    const data = new Date(dataString);
+    return data.toLocaleDateString('pt-BR');
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.navbar').nextElementSibling);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+</script>
+
+<style>
+.grafico-container {
+    position: relative;
+    height: 300px;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.badge {
+    font-size: 0.85em;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .modal-dialog {
+        max-width: none;
+        margin: 0;
+    }
+    
+    .modal-content {
+        border: none;
+        height: auto;
+        min-height: 100vh;
+    }
+}
+</style>
+{% endblock %}
