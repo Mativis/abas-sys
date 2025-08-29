@@ -15,28 +15,59 @@
         </div>
     </div>
     <div class="card-body">
-        <!-- Filtros -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" id="filtroPlaca" class="form-control" placeholder="Filtrar por placa...">
-                </div>
+        <!-- Filtros Expandidos -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel"></i> Filtros
+                    <button class="btn btn-sm btn-outline-primary float-end" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosAvancados">
+                        <i class="bi bi-chevron-down"></i> Alternar
+                    </button>
+                </h5>
             </div>
-            <div class="col-md-4">
-                <select id="filtroOrdenacao" class="form-select">
-                    <option value="kml-desc">Maior KM/L primeiro</option>
-                    <option value="kml-asc">Menor KM/L primeiro</option>
-                    <option value="placa-asc">Placa (A-Z)</option>
-                    <option value="placa-desc">Placa (Z-A)</option>
-                    <option value="gasto-desc">Maior gasto primeiro</option>
-                    <option value="gasto-asc">Menor gasto primeiro</option>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="filtroApenasAtivos" checked>
-                    <label class="form-check-label" for="filtroApenasAtivos">Apenas veículos ativos</label>
+            <div class="collapse show" id="filtrosAvancados">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Placa</label>
+                            <input type="text" id="filtroPlaca" class="form-control" placeholder="Filtrar por placa...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select id="filtroStatus" class="form-select">
+                                <option value="todos">Todos</option>
+                                <option value="ativo">Ativos</option>
+                                <option value="inativo">Inativos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Consumo (KM/L)</label>
+                            <select id="filtroConsumo" class="form-select">
+                                <option value="todos">Todos</option>
+                                <option value="0-7">Baixo (0-7 KM/L)</option>
+                                <option value="7-10">Médio (7-10 KM/L)</option>
+                                <option value="10+">Alto (10+ KM/L)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Período</label>
+                            <select id="filtroPeriodo" class="form-select">
+                                <option value="todos">Todos os registros</option>
+                                <option value="30">Últimos 30 dias</option>
+                                <option value="90">Últimos 3 meses</option>
+                                <option value="180">Últimos 6 meses</option>
+                                <option value="365">Último ano</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" onclick="aplicarFiltros()">
+                                <i class="bi bi-filter"></i> Aplicar Filtros
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="limparFiltros()">
+                                <i class="bi bi-x-circle"></i> Limpar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -111,11 +142,12 @@
                                         <th class="text-end">KM Atual</th>
                                         <th class="text-end">Gasto Total</th>
                                         <th class="text-center">Status</th>
+                                        <th class="text-center">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody id="corpoTabela">
                                     <tr>
-                                        <td colspan="6" class="text-center py-4">
+                                        <td colspan="7" class="text-center py-4">
                                             <div class="spinner-border text-primary" role="status">
                                                 <span class="visually-hidden">Carregando...</span>
                                             </div>
@@ -251,6 +283,12 @@
 let dadosMedias = [];
 let graficoKML = null;
 let graficoGastos = null;
+let filtrosAtivos = {
+    placa: '',
+    status: 'todos',
+    consumo: 'todos',
+    periodo: 'todos'
+};
 
 // Carregar dados ao iniciar
 document.addEventListener('DOMContentLoaded', function() {
@@ -263,13 +301,13 @@ function carregarDados() {
         .then(response => response.json())
         .then(data => {
             dadosMedias = data;
-            atualizarInterface();
+            aplicarFiltros();
         })
         .catch(error => {
             console.error('Erro ao carregar dados:', error);
             document.getElementById('corpoTabela').innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center text-danger py-4">
+                    <td colspan="7" class="text-center text-danger py-4">
                         <i class="bi bi-exclamation-triangle"></i>
                         <p>Erro ao carregar dados. Tente novamente.</p>
                     </td>
@@ -280,57 +318,95 @@ function carregarDados() {
 
 function configurarFiltros() {
     // Filtro de placa
-    document.getElementById('filtroPlaca').addEventListener('input', filtrarTabela);
+    document.getElementById('filtroPlaca').addEventListener('input', function() {
+        filtrosAtivos.placa = this.value;
+        aplicarFiltros();
+    });
     
-    // Filtro de ordenação
-    document.getElementById('filtroOrdenacao').addEventListener('change', filtrarTabela);
+    // Filtro de status
+    document.getElementById('filtroStatus').addEventListener('change', function() {
+        filtrosAtivos.status = this.value;
+        aplicarFiltros();
+    });
     
-    // Filtro de veículos ativos
-    document.getElementById('filtroApenasAtivos').addEventListener('change', filtrarTabela);
+    // Filtro de consumo
+    document.getElementById('filtroConsumo').addEventListener('change', function() {
+        filtrosAtivos.consumo = this.value;
+        aplicarFiltros();
+    });
+    
+    // Filtro de período
+    document.getElementById('filtroPeriodo').addEventListener('change', function() {
+        filtrosAtivos.periodo = this.value;
+        aplicarFiltros();
+    });
 }
 
-function filtrarTabela() {
-    const filtroPlaca = document.getElementById('filtroPlaca').value.toLowerCase();
-    const ordenacao = document.getElementById('filtroOrdenacao').value;
-    const apenasAtivos = document.getElementById('filtroApenasAtivos').checked;
-
-    let dadosFiltrados = dadosMedias.filter(veiculo => {
-        const placaMatch = veiculo.placa.toLowerCase().includes(filtroPlaca);
-        const ativoMatch = !apenasAtivos || (veiculo.km_atual && veiculo.km_atual > 0);
-        return placaMatch && ativoMatch;
-    });
-
-    // Ordenação
-    switch(ordenacao) {
-        case 'kml-desc':
-            dadosFiltrados.sort((a, b) => (b.media_kml || 0) - (a.media_kml || 0));
-            break;
-        case 'kml-asc':
-            dadosFiltrados.sort((a, b) => (a.media_kml || 0) - (b.media_kml || 0));
-            break;
-        case 'placa-asc':
-            dadosFiltrados.sort((a, b) => a.placa.localeCompare(b.placa));
-            break;
-        case 'placa-desc':
-            dadosFiltrados.sort((a, b) => b.placa.localeCompare(a.placa));
-            break;
-        case 'gasto-desc':
-            dadosFiltrados.sort((a, b) => (b.total_gasto || 0) - (a.total_gasto || 0));
-            break;
-        case 'gasto-asc':
-            dadosFiltrados.sort((a, b) => (a.total_gasto || 0) - (b.total_gasto || 0));
-            break;
+function aplicarFiltros() {
+    let dadosFiltrados = [...dadosMedias];
+    
+    // Aplicar filtro de placa
+    if (filtrosAtivos.placa) {
+        dadosFiltrados = dadosFiltrados.filter(veiculo => 
+            veiculo.placa.toLowerCase().includes(filtrosAtivos.placa.toLowerCase())
+        );
     }
-
+    
+    // Aplicar filtro de status
+    if (filtrosAtivos.status !== 'todos') {
+        dadosFiltrados = dadosFiltrados.filter(veiculo => {
+            const status = veiculo.km_atual && veiculo.km_atual > 0;
+            return filtrosAtivos.status === 'ativo' ? status : !status;
+        });
+    }
+    
+    // Aplicar filtro de consumo
+    if (filtrosAtivos.consumo !== 'todos') {
+        dadosFiltrados = dadosFiltrados.filter(veiculo => {
+            if (!veiculo.media_kml) return false;
+            
+            switch(filtrosAtivos.consumo) {
+                case '0-7':
+                    return veiculo.media_kml <= 7;
+                case '7-10':
+                    return veiculo.media_kml > 7 && veiculo.media_kml <= 10;
+                case '10+':
+                    return veiculo.media_kml > 10;
+                default:
+                    return true;
+            }
+        });
+    }
+    
+    // Aplicar filtro de período (simulado - em produção, isso viria do backend)
+    if (filtrosAtivos.periodo !== 'todos') {
+        // Em uma implementação real, isso seria filtrado no backend
+        // Aqui estamos apenas simulando o filtro
+        console.log('Filtro de período selecionado:', filtrosAtivos.periodo);
+    }
+    
+    // Ordenar por KM/L decrescente por padrão
+    dadosFiltrados.sort((a, b) => (b.media_kml || 0) - (a.media_kml || 0));
+    
     atualizarTabela(dadosFiltrados);
     atualizarGraficos(dadosFiltrados);
     atualizarResumo(dadosFiltrados);
 }
 
-function atualizarInterface() {
-    filtrarTabela();
-    atualizarGraficos(dadosMedias);
-    atualizarResumo(dadosMedias);
+function limparFiltros() {
+    document.getElementById('filtroPlaca').value = '';
+    document.getElementById('filtroStatus').value = 'todos';
+    document.getElementById('filtroConsumo').value = 'todos';
+    document.getElementById('filtroPeriodo').value = 'todos';
+    
+    filtrosAtivos = {
+        placa: '',
+        status: 'todos',
+        consumo: 'todos',
+        periodo: 'todos'
+    };
+    
+    aplicarFiltros();
 }
 
 function atualizarTabela(dados) {
@@ -339,7 +415,7 @@ function atualizarTabela(dados) {
     if (dados.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center py-4">
+                <td colspan="7" class="text-center py-4">
                     <i class="bi bi-inbox"></i>
                     <p class="text-muted">Nenhum veículo encontrado com os filtros aplicados.</p>
                 </td>
@@ -364,7 +440,7 @@ function atualizarTabela(dados) {
         }
 
         html += `
-            <tr style="cursor: pointer;" onclick="mostrarDetalhes('${veiculo.placa}')">
+            <tr>
                 <td>
                     <span class="badge bg-primary">${veiculo.placa}</span>
                 </td>
@@ -380,6 +456,11 @@ function atualizarTabela(dados) {
                     <span class="badge ${status ? 'bg-success' : 'bg-secondary'}">
                         ${status ? 'Ativo' : 'Inativo'}
                     </span>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-info" onclick="mostrarDetalhes('${veiculo.placa}')">
+                        <i class="bi bi-info-circle"></i> Detalhes
+                    </button>
                 </td>
             </tr>
         `;
@@ -570,7 +651,7 @@ function verRelatorioVeiculo() {
 function atualizarDados() {
     document.getElementById('corpoTabela').innerHTML = `
         <tr>
-            <td colspan="6" class="text-center py-4">
+            <td colspan="7" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Carregando...</span>
                 </div>
@@ -623,6 +704,15 @@ function showAlert(message, type) {
 
 .badge {
     font-size: 0.85em;
+}
+
+/* Estilo para os filtros */
+#filtrosAvancados {
+    transition: all 0.3s ease;
+}
+
+.collapse.show {
+    visibility: visible;
 }
 </style>
 {% endblock %}
