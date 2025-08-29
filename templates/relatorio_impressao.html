@@ -5,19 +5,33 @@
     <title>Relatório de Abastecimentos</title>
     <style>
         @page {
-            size: A4;
-            margin: 1.5cm;
+            size: landscape;
+            margin: 1cm;
         }
+        
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #94a3b8;
+            --light: #f1f5f9;
+            --dark: #0f172a;
+            --border: #cbd5e1;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: white;
+            color: #475569;
+            line-height: 1.4;
             margin: 0;
             padding: 0;
-            color: #333;
+            font-size: 10px;
         }
+
         .no-print {
             display: none;
         }
+
         @media print {
             .no-print {
                 display: none !important;
@@ -27,261 +41,456 @@
                 margin: 0;
             }
         }
-        h1 {
-            color: #2c3e50;
+
+        .header {
             text-align: center;
-            font-size: 18px;
-            margin-bottom: 5px;
+            margin-bottom: 20px;
+            padding: 20px 0;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-radius: 12px;
+        }
+
+        .header .title {
+            font-size: 20px;
+            font-weight: 800;
+            margin: 0;
             text-transform: uppercase;
+            letter-spacing: -0.5px;
         }
-        h2 {
-            color: #2c3e50;
+
+        .header .subtitle {
             font-size: 14px;
-            margin-top: 0;
-            margin-bottom: 5px;
+            font-weight: 500;
+            margin: 5px 0 0 0;
+            opacity: 0.9;
         }
+
+        .filtros {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--light);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .filtros-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .filtro-item {
+            padding: 8px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .filtro-item strong {
+            color: var(--primary-dark);
+            display: block;
+            margin-bottom: 3px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
-            page-break-inside: avoid;
+            margin: 15px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
+
         th {
-            background-color: #3498db;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
-            padding: 6px;
+            padding: 12px 6px;
             text-align: left;
-            border: 1px solid #ddd;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
         }
+
         td {
-            padding: 6px;
-            border: 1px solid #ddd;
+            padding: 10px 6px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            font-size: 9px;
         }
-        .header {
-            margin-bottom: 15px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        .filtros {
-            margin-bottom: 15px;
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        .footer {
-            margin-top: 20px;
-            font-size: 10px;
-            text-align: center;
-            color: #7f8c8d;
-            border-top: 1px solid #eee;
-            padding-top: 10px;
-        }
+
         .text-right {
             text-align: right;
         }
+
         .text-center {
             text-align: center;
         }
+
         .total-row {
-            background-color: #e3f2fd;
-            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            font-weight: 600;
         }
+
+        .total-row td {
+            border: none;
+            padding: 12px 6px;
+        }
+
+        .summary-row {
+            background: var(--light);
+            font-weight: 500;
+        }
+
         .resumo {
             margin-top: 20px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #ddd;
+            padding: 15px;
+            background: var(--light);
+            border-radius: 10px;
+            border: 1px solid var(--border);
         }
+
+        .resumo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
         .resumo-item {
-            display: inline-block;
-            margin-right: 20px;
-            padding: 5px 10px;
-            background-color: white;
-            border-radius: 3px;
-            border: 1px solid #ddd;
-        }
-        
-        /* Novos estilos para o layout reformulado */
-        .cabecalho-relatorio {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
             text-align: center;
-            margin-bottom: 20px;
         }
-        .cabecalho-relatorio .logo {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .cabecalho-relatorio .titulo {
-            font-size: 18px;
-            font-weight: bold;
+
+        .resumo-item strong {
+            display: block;
+            color: var(--primary-dark);
+            font-size: 10px;
             text-transform: uppercase;
             margin-bottom: 5px;
         }
-        .cabecalho-relatorio .periodo {
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        
-        .assinaturas {
-            margin-top: 30px;
-            page-break-inside: avoid;
-        }
-        .linha-assinaturas {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 50px;
-        }
-        .area-assinatura {
-            width: 30%;
-            text-align: center;
-            border-top: 1px solid #000;
-            padding-top: 40px;
-        }
-        .nome-setor {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .rodape {
-            margin-top: 20px;
-            font-size: 10px;
-            text-align: center;
-            color: #7f8c8d;
-            border-top: 1px solid #eee;
-            padding-top: 10px;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-        }
-        
-        .quebrapagina {
-            page-break-after: always;
+
+        .resumo-item span {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--dark);
         }
 
-        /* Estilos para as novas colunas */
-        .col-valor {
-            min-width: 80px;
+        .assinaturas {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid var(--border);
         }
-        .col-desconto {
-            min-width: 70px;
+
+        .assinaturas-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
         }
+
+        .assinatura-item {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .assinatura-linha {
+            border-top: 1px solid var(--dark);
+            margin: 40px auto 10px auto;
+            width: 80%;
+        }
+
+        .assinatura-nome {
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-top: 5px;
+        }
+
+        .assinatura-cargo {
+            font-size: 10px;
+            color: var(--secondary);
+            text-transform: uppercase;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--secondary);
+            font-size: 10px;
+        }
+
+        .badge {
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Quebra de página para impressão */
+        @media print {
+            .page-break {
+                page-break-before: always;
+            }
+            
+            table {
+                page-break-inside: avoid;
+            }
+            
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+        }
+
+        /* Ajustes para dados específicos */
+        .col-data { width: 70px; }
+        .col-placa { width: 60px; }
+        .col-responsavel { width: 90px; }
+        .col-centro { width: 80px; }
+        .col-combustivel { width: 70px; }
+        .col-posto { width: 80px; }
+        .col-litros { width: 50px; }
+        .col-odometro { width: 60px; }
+        .col-kml { width: 50px; }
+        .col-valor { width: 65px; }
     </style>
 </head>
 <body>
-    <div class="cabecalho-relatorio">
-        <div class="logo">GEOESP</div>
-        <div class="titulo">RELATÓRIO DE ABASTECIMENTOS</div>
-        <div class="periodo">Período: {{ filtros.data_inicio }} até {{ filtros.data_fim }}</div>
+    <div class="header">
+        <h1 class="title">Relatório de Abastecimentos</h1>
+        <p class="subtitle">Período: {{ filtros.data_inicio }} até {{ filtros.data_fim }}</p>
     </div>
 
     <div class="filtros">
-        <h2>FILTROS APLICADOS</h2>
-        <p><strong>Período:</strong> {{ filtros.data_inicio }} até {{ filtros.data_fim }}</p>
-        {% if filtros.placa %}<p><strong>Placa:</strong> {{ filtros.placa }}</p>{% endif %}
-        {% if filtros.centro_custo %}<p><strong>Centro de Custo:</strong> {{ filtros.centro_custo }}</p>{% endif %}
-        {% if filtros.combustivel %}<p><strong>Combustível:</strong> {{ filtros.combustivel }}</p>{% endif %}
-        {% if filtros.posto %}<p><strong>Posto:</strong> {{ filtros.posto }}</p>{% endif %}
+        <h3 style="margin: 0 0 15px 0; color: var(--primary-dark); font-size: 14px;">Filtros Aplicados</h3>
+        <div class="filtros-grid">
+            <div class="filtro-item">
+                <strong>Período</strong>
+                {{ filtros.data_inicio }} até {{ filtros.data_fim }}
+            </div>
+            {% if filtros.placa %}
+            <div class="filtro-item">
+                <strong>Placa</strong>
+                {{ filtros.placa }}
+            </div>
+            {% endif %}
+            {% if filtros.centro_custo %}
+            <div class="filtro-item">
+                <strong>Centro de Custo</strong>
+                {{ filtros.centro_custo }}
+            </div>
+            {% endif %}
+            {% if filtros.combustivel %}
+            <div class="filtro-item">
+                <strong>Combustível</strong>
+                {{ filtros.combustivel }}
+            </div>
+            {% endif %}
+            {% if filtros.posto %}
+            <div class="filtro-item">
+                <strong>Posto</strong>
+                {{ filtros.posto }}
+            </div>
+            {% endif %}
+        </div>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>Data</th>
-                <th>Placa</th>
-                <th>Centro de Custo</th>
-                <th>Combustível</th>
-                <th>Posto</th>
-                <th class="text-right">Litros</th>
-                <th class="text-right">Odômetro</th>
-                <th class="text-right">KM/L</th>
-                <th class="text-right col-valor">Valor Bruto (R$)</th>
-                <th class="text-right col-desconto">Desconto (R$)</th>
-                <th class="text-right col-valor">Valor Líquido (R$)</th>
+                <th class="col-data">Data</th>
+                <th class="col-placa">Placa</th>
+                <th class="col-responsavel">Responsável</th>
+                <th class="col-centro">Centro Custo</th>
+                <th class="col-combustivel">Combustível</th>
+                <th class="col-posto">Posto</th>
+                <th class="col-litros text-right">Litros</th>
+                <th class="col-odometro text-right">Odômetro</th>
+                <th class="col-kml text-right">KM/L</th>
+                <th class="col-valor text-right">Valor Bruto</th>
+                <th class="col-valor text-right">Desconto</th>
+                <th class="col-valor text-right">Valor Líquido</th>
             </tr>
         </thead>
         <tbody>
             {% for item in dados %}
             <tr>
                 <td>{{ item.data }}</td>
-                <td>{{ item.placa }}</td>
+                <td><strong>{{ item.placa }}</strong></td>
+                <td>{{ item.responsavel if item.responsavel else '-' }}</td>
                 <td>{{ item.centro_custo if item.centro_custo else '-' }}</td>
                 <td>{{ item.combustivel }}</td>
                 <td>{{ item.posto if item.posto else '-' }}</td>
                 <td class="text-right">{{ "%.3f"|format(item.litros) }}</td>
                 <td class="text-right">{{ "%.1f"|format(item.odometro) if item.odometro else '-' }}</td>
-                <td class="text-right">{{ "%.2f"|format(item.km_litro) if item.km_litro else '-' }}</td>
-                <td class="text-right">{{ "%.2f"|format(item.custo_bruto) }}</td>
-                <td class="text-right">{{ "%.2f"|format(item.desconto) if item.desconto else '0,00' }}</td>
-                <td class="text-right">{{ "%.2f"|format(item.custo_liquido) }}</td>
+                <td class="text-right">
+                    {% if item.km_litro %}
+                        <span class="badge {% if item.km_litro > 10 %}badge-success{% elif item.km_litro > 7 %}badge-warning{% else %}badge-danger{% endif %}">
+                            {{ "%.2f"|format(item.km_litro) }}
+                        </span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="text-right">R$ {{ "%.2f"|format(item.custo_bruto) }}</td>
+                <td class="text-right">R$ {{ "%.2f"|format(item.desconto) if item.desconto else '0,00' }}</td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(item.custo_liquido) }}</strong></td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot>
             <tr class="total-row">
-                <td colspan="5">TOTAL</td>
-                <td class="text-right">{{ "%.3f"|format(dados|sum(attribute='litros')) }}</td>
+                <td colspan="6"><strong>TOTAL GERAL</strong></td>
+                <td class="text-right"><strong>{{ "%.3f"|format(dados|sum(attribute='litros')) }} L</strong></td>
                 <td colspan="2"></td>
-                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto')) }}</td>
-                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='desconto')) }}</td>
-                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}</td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto')) }}</strong></td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(dados|sum(attribute='desconto')) }}</strong></td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}</strong></td>
             </tr>
-            <tr class="total-row">
-                <td colspan="8">MÉDIA POR ABASTECIMENTO</td>
-                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto') / dados|length) if dados|length > 0 else '0,00' }}</td>
-                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='desconto') / dados|length) if dados|length > 0 else '0,00' }}</td>
-                <td class="text-right">R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido') / dados|length) if dados|length > 0 else '0,00' }}</td>
+            <tr class="summary-row">
+                <td colspan="6"><strong>MÉDIA POR ABASTECIMENTO</strong></td>
+                <td class="text-right"><strong>{{ "%.3f"|format(dados|sum(attribute='litros') / dados|length) if dados|length > 0 else '0,000' }} L</strong></td>
+                <td colspan="2"></td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto') / dados|length) if dados|length > 0 else '0,00' }}</strong></td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(dados|sum(attribute='desconto') / dados|length) if dados|length > 0 else '0,00' }}</strong></td>
+                <td class="text-right"><strong>R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido') / dados|length) if dados|length > 0 else '0,00' }}</strong></td>
             </tr>
         </tfoot>
     </table>
 
     <div class="resumo">
-        <div class="resumo-item">
-            <strong>Total de Registros:</strong> {{ dados|length }}
-        </div>
-        <div class="resumo-item">
-            <strong>Total Litros:</strong> {{ "%.3f"|format(dados|sum(attribute='litros')) }} L
-        </div>
-        <div class="resumo-item">
-            <strong>Valor Bruto Total:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto')) }}
-        </div>
-        <div class="resumo-item">
-            <strong>Desconto Total:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='desconto')) }}
-        </div>
-        <div class="resumo-item">
-            <strong>Valor Líquido Total:</strong> R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}
-        </div>
-        <div class="resumo-item">
-            <strong>Postos Diferentes:</strong> {{ dados|map(attribute='posto')|unique|list|length }}
+        <h3 style="margin: 0 0 15px 0; color: var(--primary-dark); font-size: 14px;">Resumo Estatístico</h3>
+        <div class="resumo-grid">
+            <div class="resumo-item">
+                <strong>Total de Registros</strong>
+                <span>{{ dados|length }}</span>
+            </div>
+            <div class="resumo-item">
+                <strong>Total Litros</strong>
+                <span>{{ "%.3f"|format(dados|sum(attribute='litros')) }} L</span>
+            </div>
+            <div class="resumo-item">
+                <strong>Valor Bruto Total</strong>
+                <span>R$ {{ "%.2f"|format(dados|sum(attribute='custo_bruto')) }}</span>
+            </div>
+            <div class="resumo-item">
+                <strong>Desconto Total</strong>
+                <span>R$ {{ "%.2f"|format(dados|sum(attribute='desconto')) }}</span>
+            </div>
+            <div class="resumo-item">
+                <strong>Valor Líquido Total</strong>
+                <span>R$ {{ "%.2f"|format(dados|sum(attribute='custo_liquido')) }}</span>
+            </div>
+            <div class="resumo-item">
+                <strong>Postos Diferentes</strong>
+                <span>{{ dados|map(attribute='posto')|unique|list|length }}</span>
+            </div>
+            <div class="resumo-item">
+                <strong>Responsáveis Diferentes</strong>
+                <span>{{ dados|map(attribute='responsavel')|unique|list|length }}</span>
+            </div>
         </div>
     </div>
 
     <div class="assinaturas">
-        <div class="linha-assinaturas">
-            <div class="area-assinatura">
-                <div class="nome-setor">DEPARTAMENTO DE LOGÍSTICA</div>
+        <div class="assinaturas-grid">
+            <div class="assinatura-item">
+                <div class="assinatura-linha"></div>
+                <div class="assinatura-nome">_________________________</div>
+                <div class="assinatura-cargo">Responsável pelo Abastecimento</div>
             </div>
-            
-            <div class="area-assinatura">
-                <div class="nome-setor">COORDENAÇÃO</div>
+            <div class="assinatura-item">
+                <div class="assinatura-linha"></div>
+                <div class="assinatura-nome">_________________________</div>
+                <div class="assinatura-cargo">Coordenação de Frota</div>
             </div>
-            
-            <div class="area-assinatura">
-                <div class="nome-setor">DIRETORIA</div>
+            <div class="assinatura-item">
+                <div class="assinatura-linha"></div>
+                <div class="assinatura-nome">_________________________</div>
+                <div class="assinatura-cargo">Diretoria</div>
             </div>
         </div>
     </div>
 
     <div class="footer">
-        <p>Emitido em: {{ data_emissao }}</p>
-        <p>Sistema de Abastecimentos - Relatório Gerado Automaticamente</p>
+        <p>Relatório gerado em: {{ data_emissao }} | Sistema de Abastecimentos - FuelManager</p>
     </div>
 
-    <div class="actions no-print">
-        <button onclick="window.print()">Imprimir Relatório</button>
-        <button onclick="window.close()">Fechar</button>
+    <div class="actions no-print" style="margin-top: 30px; text-align: center;">
+        <button onclick="window.print()" style="background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-right: 10px;">
+            🖨️ Imprimir Relatório
+        </button>
+        <button onclick="window.close()" style="background: var(--secondary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+            ❌ Fechar
+        </button>
     </div>
+
+    <script>
+        // Formatação de datas para DD/MM/AAAA via JavaScript
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            
+            // Verifica se a data já está no formato DD/MM/AAAA
+            if (dateString.includes('/')) {
+                return dateString;
+            }
+            
+            // Converte de YYYY-MM-DD para DD/MM/AAAA
+            const parts = dateString.split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            
+            return dateString;
+        }
+
+        // Aplicar formatação a todas as datas
+        document.addEventListener('DOMContentLoaded', function() {
+            // Format datas no cabeçalho
+            const periodoElement = document.querySelector('.subtitle');
+            if (periodoElement) {
+                periodoElement.textContent = periodoElement.textContent
+                    .replace(/(\d{4}-\d{2}-\d{2})/g, formatDate);
+            }
+
+            // Format datas nos filtros
+            const filtroItems = document.querySelectorAll('.filtro-item');
+            filtroItems.forEach(item => {
+                item.textContent = item.textContent
+                    .replace(/(\d{4}-\d{2}-\d{2})/g, formatDate);
+            });
+
+            // Format datas na tabela
+            const dateCells = document.querySelectorAll('td:first-child');
+            dateCells.forEach(cell => {
+                cell.textContent = formatDate(cell.textContent);
+            });
+        });
+    </script>
 </body>
 </html>
