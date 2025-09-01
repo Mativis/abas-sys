@@ -89,19 +89,19 @@
             <div class="card-body">
                 <div class="row text-center">
                     <div class="col-md-3">
-                        <h4 id="total-abastecimentos">0</h4>
+                        <h4 id="total-abastecimentos">{{ total_abastecimentos }}</h4>
                         <p class="text-muted">Abastecimentos</p>
                     </div>
                     <div class="col-md-3">
-                        <h4 id="total-veiculos-dash">0</h4>
+                        <h4 id="total-veiculos-dash">{{ total_veiculos }}</h4>
                         <p class="text-muted">Veículos</p>
                     </div>
                     <div class="col-md-3">
-                        <h4 id="total-manutencoes-dash">0</h4>
+                        <h4 id="total-manutencoes-dash">{{ total_manutencoes }}</h4>
                         <p class="text-muted">Manutenções</p>
                     </div>
                     <div class="col-md-3">
-                        <h4 id="gasto-total-dash">R$ 0,00</h4>
+                        <h4 id="gasto-total-dash">R$ {{ "%.2f"|format(gasto_total) }}</h4>
                         <p class="text-muted">Gasto Total</p>
                     </div>
                 </div>
@@ -117,13 +117,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function carregarDadosDashboard() {
-    // Simulação de dados - em produção, isso viria de uma API
-    setTimeout(() => {
-        document.getElementById('total-abastecimentos').textContent = '156';
-        document.getElementById('total-veiculos-dash').textContent = '23';
-        document.getElementById('total-manutencoes-dash').textContent = '42';
-        document.getElementById('gasto-total-dash').textContent = 'R$ 45.678,90';
-    }, 1000);
+    fetch('/api/dashboard')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('total-abastecimentos').textContent = data.total_abastecimentos.toLocaleString();
+                document.getElementById('total-veiculos-dash').textContent = data.total_veiculos.toLocaleString();
+                document.getElementById('total-manutencoes-dash').textContent = data.total_manutencoes.toLocaleString();
+                document.getElementById('gasto-total-dash').textContent = 'R$ ' + data.gasto_total.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            } else {
+                console.error('Erro ao carregar dados do dashboard:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dashboard:', error);
+        });
 }
 </script>
 
@@ -147,3 +158,4 @@ function carregarDadosDashboard() {
 }
 </style>
 {% endblock %}
+[file content end]

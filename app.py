@@ -91,6 +91,44 @@ def index():
                              total_manutencoes=0,
                              gasto_total=0)
 
+@app.route('/api/dashboard')
+def api_dashboard():
+    """API para dados do dashboard"""
+    try:
+        conn = sqlite3.connect('abastecimentos.db')
+        cursor = conn.cursor()
+        
+        # Total de abastecimentos
+        cursor.execute("SELECT COUNT(*) FROM abastecimentos")
+        total_abastecimentos = cursor.fetchone()[0]
+        
+        # Total de veículos
+        cursor.execute("SELECT COUNT(DISTINCT placa) FROM abastecimentos")
+        total_veiculos = cursor.fetchone()[0]
+        
+        # Total de manutenções
+        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        total_manutencoes = cursor.fetchone()[0]
+        
+        # Gasto total
+        cursor.execute("SELECT SUM(custo_liquido) FROM abastecimentos")
+        gasto_total = cursor.fetchone()[0] or 0
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'total_abastecimentos': total_abastecimentos,
+            'total_veiculos': total_veiculos,
+            'total_manutencoes': total_manutencoes,
+            'gasto_total': gasto_total
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/relatorios', methods=['GET', 'POST'])
 def relatorios():
     # Obter preços de combustível
@@ -223,8 +261,32 @@ def api_manutencoes():
         try:
             query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
             df = pd.read_sql(query, conn)
+            
+            # Calcular estatísticas
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM manutencoes")
+            total = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 0")
+            abertas = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 1")
+            finalizadas = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT SUM(valor) FROM manutencoes")
+            valor_total = cursor.fetchone()[0] or 0
+            
             conn.close()
-            return jsonify(df.to_dict('records'))
+            
+            return jsonify({
+                'manutencoes': df.to_dict('records'),
+                'estatisticas': {
+                    'total': total,
+                    'abertas': abertas,
+                    'finalizadas': finalizadas,
+                    'valor_total': valor_total
+                }
+            })
         except Exception as e:
             conn.close()
             return jsonify({'success': False, 'error': str(e)}), 500
