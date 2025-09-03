@@ -40,17 +40,95 @@ def criar_tabelas():
     )
     ''')
     
-    # Tabela de trocas de óleo (NOVA)
+    # Tabela de trocas de óleo (ATUALIZADA)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS trocas_oleo (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        placa TEXT NOT NULL,
+        identificacao TEXT NOT NULL,
+        tipo TEXT CHECK(tipo IN ('veiculo', 'maquina')) NOT NULL,
         data_troca TEXT NOT NULL,
-        km_troca REAL NOT NULL,
-        proxima_troca_km REAL NOT NULL,
+        km_troca REAL,
+        horimetro_troca REAL,
+        proxima_troca_km REAL,
+        proxima_troca_horimetro REAL,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(identificacao, tipo)
+    )
+    ''')
+    
+    # Tabela de checklists
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS checklists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identificacao TEXT NOT NULL,
+        data TEXT NOT NULL,
+        horimetro REAL,
+        nivel_oleo TEXT CHECK(nivel_oleo IN ('ADEQUADO', 'BAIXO', 'CRÍTICO')) DEFAULT 'ADEQUADO',
+        observacoes TEXT,
+        itens_checklist TEXT,
         data_registro TEXT DEFAULT CURRENT_TIMESTAMP
     )
     ''')
+    
+    # Tabela de manutenções
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS manutencoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identificacao TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        frota TEXT NOT NULL,
+        descricao TEXT NOT NULL,
+        fornecedor TEXT,
+        valor REAL DEFAULT 0,
+        data_abertura TEXT NOT NULL,
+        previsao_conclusao TEXT,
+        data_conclusao TEXT,
+        observacoes TEXT,
+        finalizada BOOLEAN DEFAULT 0,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # Verificar e atualizar a estrutura da tabela trocas_oleo se necessário
+    cursor.execute("PRAGMA table_info(trocas_oleo)")
+    colunas_existentes = [coluna[1] for coluna in cursor.fetchall()]
+
+    # Atualizar estrutura da tabela trocas_oleo se for antiga
+    if 'placa' in colunas_existentes and 'identificacao' not in colunas_existentes:
+        print("Atualizando estrutura da tabela trocas_oleo...")
+        
+        # Criar tabela temporária com nova estrutura
+        cursor.execute('''
+        CREATE TABLE trocas_oleo_temp (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identificacao TEXT NOT NULL,
+            tipo TEXT CHECK(tipo IN ('veiculo', 'maquina')) NOT NULL,
+            data_troca TEXT NOT NULL,
+            km_troca REAL,
+            horimetro_troca REAL,
+            proxima_troca_km REAL,
+            proxima_troca_horimetro REAL,
+            data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(identificacao, tipo)
+        )
+        ''')
+        
+        # Copiar dados da tabela antiga para a nova
+        cursor.execute('''
+        INSERT INTO trocas_oleo_temp (id, identificacao, tipo, data_troca, km_troca, horimetro_troca, 
+                                      proxima_troca_km, proxima_troca_horimetro, data_registro)
+        SELECT id, placa, 'veiculo', data_troca, km_troca, horimetro_troca, 
+               proxima_troca_km, proxima_troca_horimetro, data_registro
+        FROM trocas_oleo
+        ''')
+        
+        # Excluir tabela antiga
+        cursor.execute('DROP TABLE trocas_oleo')
+        
+        # Renomear tabela temporária
+        cursor.execute('ALTER TABLE trocas_oleo_temp RENAME TO trocas_oleo')
+        
+        print("Estrutura da tabela trocas_oleo atualizada com sucesso!")
     
     # Valores padrão para combustíveis
     cursor.execute("SELECT COUNT(*) FROM precos_combustivel")
@@ -206,8 +284,8 @@ def obter_relatorio(data_inicio, data_fim, placa=None, centro_custo=None, combus
     except Exception as e:
         conn.close()
         raise e
-    
-    conn.close()
+    finally:
+        conn.close()
     return df
 
 def calcular_medias_veiculos():
@@ -455,72 +533,206 @@ def criar_registro(dados):
     finally:
         conn.close()
 
-def obter_trocas_oleo():
-    """Obtém todas as trocas de óleo com informações de KM atual"""
-    conn = sqlite3.connect('abastecimentos.db')
-    
-    query = """
-    SELECT t.placa, t.data_troca, t.km_troca, t.proxima_troca_km,
-           MAX(a.odometro) as km_atual,
-           (t.proxima_troca_km - MAX(a.odometro)) as km_remanescentes
-    FROM trocas_oleo t
-    LEFT JOIN abastecimentos a ON t.placa = a.placa
-    GROUP BY t.placa
-    ORDER BY km_remanescentes ASC
-    """
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute(query)
-        resultados = cursor.fetchall()
-        
-        trocas = []
-        for row in resultados:
-            trocas.append({
-                'placa': row[0],
-                'data_troca': row[1],
-                'km_troca': row[2],
-                'proxima_troca_km': row[3],
-                'km_atual': row[4] if row[4] else row[2],  # Se não há abastecimento, usa km_troca
-                'km_remanescentes': row[5] if row[5] is not None else (row[3] - row[2])
-            })
-        
-        return trocas
-    except Exception as e:
-        print(f"Erro ao obter trocas de óleo: {e}")
-        return []
-    finally:
-        conn.close()
-
-def salvar_troca_oleo(placa, data_troca, km_troca):
-    """Salva ou atualiza dados de troca de óleo"""
+def salvar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimetro_troca=None):
+    """Salva ou atualiza dados de troca de óleo (FUNÇÃO ATUALIZADA)"""
     conn = sqlite3.connect('abastecimentos.db')
     cursor = conn.cursor()
     
     try:
-        proxima_troca_km = km_troca + 10000
+        # Calcular próximas trocas baseadas no tipo
+        if tipo == 'veiculo':
+            if km_troca is None:
+                raise ValueError("KM da troca é obrigatório para veículos")
+            proxima_troca_km = km_troca + 10000
+            proxima_troca_horimetro = None
+        else:  # maquina
+            if horimetro_troca is None:
+                raise ValueError("Horímetro da troca é obrigatório para máquinas")
+            proxima_troca_km = None
+            proxima_troca_horimetro = horimetro_troca + 350
         
-        # Verificar se já existe registro para esta placa
-        cursor.execute('SELECT id FROM trocas_oleo WHERE placa = ?', (placa,))
+        # Verificar se já existe registro para esta identificação e tipo
+        cursor.execute('SELECT id FROM trocas_oleo WHERE identificacao = ? AND tipo = ?', (identificacao, tipo))
         existing = cursor.fetchone()
         
         if existing:
+            # Atualizar registro existente
             cursor.execute('''
                 UPDATE trocas_oleo 
-                SET data_troca = ?, km_troca = ?, proxima_troca_km = ?
-                WHERE placa = ?
-            ''', (data_troca, km_troca, proxima_troca_km, placa))
+                SET data_troca = ?, km_troca = ?, horimetro_troca = ?, 
+                    proxima_troca_km = ?, proxima_troca_horimetro = ?
+                WHERE identificacao = ? AND tipo = ?
+            ''', (data_troca, km_troca, horimetro_troca, 
+                  proxima_troca_km, proxima_troca_horimetro, identificacao, tipo))
         else:
+            # Inserir novo registro
             cursor.execute('''
-                INSERT INTO trocas_oleo (placa, data_troca, km_troca, proxima_troca_km)
-                VALUES (?, ?, ?, ?)
-            ''', (placa, data_troca, km_troca, proxima_troca_km))
+                INSERT INTO trocas_oleo (identificacao, tipo, data_troca, km_troca, horimetro_troca, 
+                                        proxima_troca_km, proxima_troca_horimetro)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (identificacao, tipo, data_troca, km_troca, horimetro_troca, 
+                  proxima_troca_km, proxima_troca_horimetro))
         
         conn.commit()
         return True
     except Exception as e:
         print(f"Erro ao salvar troca de óleo: {e}")
         return False
+    finally:
+        conn.close()
+
+def obter_troca_oleo_por_identificacao_tipo(identificacao, tipo):
+    """Obtém uma troca de óleo específica por identificação e tipo"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = """
+        SELECT identificacao, tipo, data_troca, km_troca, horimetro_troca, 
+               proxima_troca_km, proxima_troca_horimetro
+        FROM trocas_oleo 
+        WHERE identificacao = ? AND tipo = ?
+        """
+        df = pd.read_sql(query, conn, params=(identificacao, tipo))
+        
+        if not df.empty:
+            return df.iloc[0].to_dict()
+        return None
+    except Exception as e:
+        print(f"Erro ao obter troca de óleo: {e}")
+        return None
+    finally:
+        conn.close()
+
+def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimetro_troca=None):
+    """Atualiza dados de troca de óleo"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    try:
+        # Calcular próximas trocas baseadas no tipo
+        if tipo == 'veiculo':
+            if km_troca is None:
+                raise ValueError("KM da troca é obrigatório para veículos")
+            proxima_troca_km = km_troca + 10000
+            proxima_troca_horimetro = None
+        else:  # maquina
+            if horimetro_troca is None:
+                raise ValueError("Horímetro da troca é obrigatório para máquinas")
+            proxima_troca_km = None
+            proxima_troca_horimetro = horimetro_troca + 350
+        
+        cursor.execute('''
+            UPDATE trocas_oleo 
+            SET data_troca = ?, km_troca = ?, horimetro_troca = ?, 
+                proxima_troca_km = ?, proxima_troca_horimetro = ?
+            WHERE identificacao = ? AND tipo = ?
+        ''', (data_troca, km_troca, horimetro_troca, 
+              proxima_troca_km, proxima_troca_horimetro, identificacao, tipo))
+        
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao atualizar troca de óleo: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_trocas_oleo():
+    """Obtém todas as trocas de óleo com informações atuais (FUNÇÃO ATUALIZADA)"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = """
+        SELECT identificacao, tipo, data_troca, km_troca, horimetro_troca, 
+               proxima_troca_km, proxima_troca_horimetro
+        FROM trocas_oleo 
+        ORDER BY tipo, identificacao
+        """
+        df_trocas = pd.read_sql(query, conn)
+        
+        trocas = []
+        
+        for _, troca in df_trocas.iterrows():
+            identificacao = troca['identificacao']
+            tipo = troca['tipo']
+            data_troca = troca['data_troca']
+            km_troca = troca['km_troca']
+            horimetro_troca = troca['horimetro_troca']
+            proxima_troca_km = troca['proxima_troca_km']
+            proxima_troca_horimetro = troca['proxima_troca_horimetro']
+            
+            # Buscar valores atuais baseados no tipo
+            valor_atual = None
+            proxima_troca = None
+            remanescente = None
+            
+            if tipo == 'veiculo':
+                # Buscar KM atual (do último abastecimento)
+                query_km = """
+                SELECT MAX(odometro) FROM abastecimentos 
+                WHERE placa = ? AND odometro IS NOT NULL
+                """
+                cursor = conn.cursor()
+                cursor.execute(query_km, (identificacao,))
+                valor_atual = cursor.fetchone()[0]
+                proxima_troca = proxima_troca_km
+                
+                if valor_atual and proxima_troca:
+                    remanescente = proxima_troca - valor_atual
+                elif km_troca and proxima_troca:
+                    remanescente = proxima_troca - km_troca
+            else:  # maquina
+                # Buscar horímetro atual (do último checklist)
+                query_horimetro = """
+                SELECT MAX(horimetro) FROM checklists 
+                WHERE identificacao = ? AND horimetro IS NOT NULL
+                """
+                cursor = conn.cursor()
+                cursor.execute(query_horimetro, (identificacao,))
+                valor_atual = cursor.fetchone()[0]
+                proxima_troca = proxima_troca_horimetro
+                
+                if valor_atual and proxima_troca:
+                    remanescente = proxima_troca - valor_atual
+                elif horimetro_troca and proxima_troca:
+                    remanescente = proxima_troca - horimetro_troca
+            
+            # Determinar status baseado no tipo e valores remanescentes
+            status = 'OK'
+            
+            if tipo == 'veiculo':
+                if remanescente is not None and remanescente <= 0:
+                    status = 'VENCIDO'
+                elif remanescente is not None and remanescente <= 1000:
+                    status = 'ATENÇÃO'
+            else:  # maquina
+                if remanescente is not None and remanescente <= 0:
+                    status = 'VENCIDO'
+                elif remanescente is not None and remanescente <= 50:
+                    status = 'ATENÇÃO'
+            
+            trocas.append({
+                'identificacao': identificacao,
+                'tipo': tipo,
+                'data_troca': data_troca,
+                'km_troca': km_troca,
+                'horimetro_troca': horimetro_troca,
+                'km_atual': valor_atual if tipo == 'veiculo' else None,
+                'horimetro_atual': valor_atual if tipo == 'maquina' else None,
+                'proxima_troca': proxima_troca,
+                'remanescente': remanescente,
+                'status': status
+            })
+        
+        # Ordenar por status (vencidos primeiro, depois atenção, depois OK)
+        ordem_status = {'VENCIDO': 0, 'ATENÇÃO': 1, 'OK': 2}
+        trocas.sort(key=lambda x: (ordem_status[x['status']], 
+                                  x['remanescente'] if x['remanescente'] is not None else float('inf')))
+        
+        return trocas
+    except Exception as e:
+        print(f"Erro ao obter trocas de óleo: {e}")
+        return []
     finally:
         conn.close()
 
@@ -536,5 +748,160 @@ def obter_placas_veiculos():
     except Exception as e:
         print(f"Erro ao obter placas: {e}")
         return []
+    finally:
+        conn.close()
+
+def criar_checklist(dados):
+    """Cria um novo checklist"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    query = """
+    INSERT INTO checklists (identificacao, data, horimetro, nivel_oleo, observacoes, itens_checklist)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """
+    
+    try:
+        cursor.execute(query, (
+            dados['identificacao'],
+            dados['data'],
+            dados.get('horimetro'),
+            dados.get('nivel_oleo', 'ADEQUADO'),
+            dados.get('observacoes', ''),
+            dados.get('itens_checklist', '')
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        print(f"Erro ao criar checklist: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_checklists():
+    """Obtém todos os checklists"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = "SELECT * FROM checklists ORDER BY data DESC"
+        df = pd.read_sql(query, conn)
+        return df.to_dict('records')
+    except Exception as e:
+        print(f"Erro ao obter checklists: {e}")
+        return []
+    finally:
+        conn.close()
+
+def obter_checklist_por_id(id):
+    """Obtém um checklist específico pelo ID"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = "SELECT * FROM checklists WHERE id = ?"
+        df = pd.read_sql(query, conn, params=(id,))
+        if not df.empty:
+            return df.iloc[0].to_dict()
+        return None
+    except Exception as e:
+        print(f"Erro ao obter checklist: {e}")
+        return None
+    finally:
+        conn.close()
+
+def atualizar_checklist(id, dados):
+    """Atualiza um checklist existente"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    query = """
+    UPDATE checklists SET
+        identificacao = ?, data = ?, horimetro = ?, 
+        nivel_oleo = ?, observacoes = ?, itens_checklist = ?
+    WHERE id = ?
+    """
+    
+    try:
+        cursor.execute(query, (
+            dados['identificacao'],
+            dados['data'],
+            dados.get('horimetro'),
+            dados.get('nivel_oleo', 'ADEQUADO'),
+            dados.get('observacoes', ''),
+            dados.get('itens_checklist', ''),
+            id
+        ))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao atualizar checklist: {e}")
+        return False
+    finally:
+        conn.close()
+
+def excluir_checklist(id):
+    """Exclui um checklist pelo ID"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DELETE FROM checklists WHERE id = ?", (id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao excluir checklist: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_identificacoes_equipamentos():
+    """Obtém todas as identificações de equipamentos dos checklists"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = """
+        SELECT DISTINCT identificacao 
+        FROM checklists 
+        WHERE identificacao IS NOT NULL AND identificacao != ''
+        ORDER BY identificacao
+        """
+        df = pd.read_sql(query, conn)
+        return df['identificacao'].tolist()
+    except Exception as e:
+        print(f"Erro ao obter identificações de equipamentos: {e}")
+        return []
+    finally:
+        conn.close()
+
+def obter_checklists_por_identificacao(identificacao):
+    """Obtém todos os checklists relacionados a uma identificação"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = """
+        SELECT id, data, horimetro, nivel_oleo, observacoes 
+        FROM checklists 
+        WHERE identificacao = ?
+        ORDER BY data DESC, horimetro DESC
+        """
+        df = pd.read_sql(query, conn, params=(identificacao,))
+        return df.to_dict('records')
+    except Exception as e:
+        print(f"Erro ao obter checklists para identificação {identificacao}: {e}")
+        return []
+    finally:
+        conn.close()
+
+def excluir_troca_oleo(identificacao, tipo):
+    """Exclui uma troca de óleo pela identificação e tipo"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DELETE FROM trocas_oleo WHERE identificacao = ? AND tipo = ?", (identificacao, tipo))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao excluir troca de óleo: {e}")
+        return False
     finally:
         conn.close()

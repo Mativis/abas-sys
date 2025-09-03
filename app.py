@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 import pandas as pd
 import os
 import sqlite3
@@ -6,6 +6,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+import io
+import csv
 from database import ( 
     criar_tabelas, 
     obter_relatorio,
@@ -21,7 +23,17 @@ from database import (
     obter_registro_por_id,
     obter_trocas_oleo,
     salvar_troca_oleo,
-    obter_placas_veiculos
+    obter_placas_veiculos,
+    criar_checklist,
+    obter_checklists,
+    obter_checklist_por_id,
+    atualizar_checklist,
+    excluir_checklist,
+    obter_identificacoes_equipamentos,
+    obter_checklists_por_identificacao,
+    excluir_troca_oleo,
+    obter_troca_oleo_por_identificacao_tipo,
+    atualizar_troca_oleo
 )
 
 app = Flask(__name__)
@@ -70,6 +82,10 @@ def index():
         cursor.execute("SELECT COUNT(*) FROM manutencoes")
         total_manutencoes = cursor.fetchone()[0]
         
+        # Total de checklists
+        cursor.execute("SELECT COUNT(*) FROM checklists")
+        total_checklists = cursor.fetchone()[0]
+        
         # Gasto total
         cursor.execute("SELECT SUM(custo_liquido) FROM abastecimentos")
         gasto_total = cursor.fetchone()[0] or 0
@@ -81,6 +97,7 @@ def index():
                              total_abastecimentos=total_abastecimentos,
                              total_veiculos=total_veiculos,
                              total_manutencoes=total_manutencoes,
+                             total_checklists=total_checklists,
                              gasto_total=gasto_total)
     except Exception as e:
         print(f"Erro ao carregar dados do dashboard: {e}")
@@ -89,6 +106,7 @@ def index():
                              total_abastecimentos=0,
                              total_veiculos=0,
                              total_manutencoes=0,
+                             total_checklists=0,
                              gasto_total=0)
 
 @app.route('/api/dashboard')
@@ -110,6 +128,10 @@ def api_dashboard():
         cursor.execute("SELECT COUNT(*) FROM manutencoes")
         total_manutencoes = cursor.fetchone()[0]
         
+        # Total de checklists
+        cursor.execute("SELECT COUNT(*) FROM checklists")
+        total_checklists = cursor.fetchone()[0]
+        
         # Gasto total
         cursor.execute("SELECT SUM(custo_liquido) FROM abastecimentos")
         gasto_total = cursor.fetchone()[0] or 0
@@ -121,6 +143,7 @@ def api_dashboard():
             'total_abastecimentos': total_abastecimentos,
             'total_veiculos': total_veiculos,
             'total_manutencoes': total_manutencoes,
+            'total_checklists': total_checklists,
             'gasto_total': gasto_total
         })
     except Exception as e:
@@ -185,41 +208,14 @@ def relatorios():
 def manutencoes():
     """Página de gerenciamento de manutenções"""
     try:
-        # Verificar se a tabela de manutenções existe e criar se não existir
-        conn = sqlite3.connect('abastecimentos.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name='manutencoes'
-        ''')
-        
-        if not cursor.fetchone():
-            # Criar tabela se não existir
-            cursor.execute('''
-                CREATE TABLE manutencoes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    identificacao TEXT NOT NULL,
-                    tipo TEXT NOT NULL,
-                    frota TEXT NOT NULL,
-                    descricao TEXT NOT NULL,
-                    fornecedor TEXT,
-                    valor REAL DEFAULT 0,
-                    data_abertura TEXT NOT NULL,
-                    previsao_conclusao TEXT,
-                    data_conclusao TEXT,
-                    observacoes TEXT,
-                    finalizada BOOLEAN DEFAULT 0,
-                    data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            conn.commit()
-        
         # Buscar manutenções
         query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
+        conn = sqlite3.connect('abastecimentos.db')
         df = pd.read_sql(query, conn)
         manutencoes = df.to_dict('records')
         
         # Estatísticas para a página
+        cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM manutencoes")
         total_manutencoes = cursor.fetchone()[0]
         
@@ -397,6 +393,139 @@ def api_manutencao(id):
             conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
 
+@app.route('/checklists')
+def checklists():
+    """Página de gerenciamento de checklists"""
+    try:
+        # Buscar checklists
+        query = "SELECT * FROM checklists ORDER BY data DESC"
+        conn = sqlite3.connect('abastecimentos.db')
+        df = pd.read_sql(query, conn)
+        checklists = df.to_dict('records')
+        
+        conn.close()
+        
+        return render_template('checklists.html', 
+                             active_page='checklists',
+                             checklists=checklists)
+    except Exception as e:
+        flash(f'Erro ao carregar checklists: {str(e)}', 'danger')
+        return render_template('checklists.html', 
+                             active_page='checklists',
+                             checklists=[])
+
+@app.route('/api/checklists', methods=['GET', 'POST'])
+def api_checklists():
+    """API para gerenciar checklists"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    if request.method == 'GET':
+        # Retornar lista de checklists
+        try:
+            query = "SELECT * FROM checklists ORDER BY data DESC"
+            df = pd.read_sql(query, conn)
+            conn.close()
+            
+            return jsonify({
+                'checklists': df.to_dict('records')
+            })
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        # Criar novo checklist
+        dados = request.get_json()
+        
+        query = '''
+            INSERT INTO checklists 
+            (identificacao, data, horimetro, nivel_oleo, observacoes, itens_checklist)
+            VALUES (?, ?, ?, ?, ?, ?)
+        '''
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, (
+                dados['identificacao'],
+                dados['data'],
+                dados.get('horimetro'),
+                dados.get('nivel_oleo', 'ADEQUADO'),
+                dados.get('observacoes', ''),
+                dados.get('itens_checklist', '')
+            ))
+            conn.commit()
+            checklist_id = cursor.lastrowid
+            conn.close()
+            
+            return jsonify({'success': True, 'id': checklist_id})
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/checklists/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+def api_checklist(id):
+    """API para gerenciar um checklist específico"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    if request.method == 'GET':
+        # Buscar checklist específico
+        try:
+            query = "SELECT * FROM checklists WHERE id = ?"
+            df = pd.read_sql(query, conn, params=(id,))
+            conn.close()
+            
+            if not df.empty:
+                return jsonify(df.iloc[0].to_dict())
+            return jsonify({'error': 'Checklist não encontrado'}), 404
+        except Exception as e:
+            conn.close()
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'PUT':
+        # Atualizar checklist
+        dados = request.get_json()
+        
+        query = '''
+            UPDATE checklists SET
+                identificacao = ?, data = ?, horimetro = ?, 
+                nivel_oleo = ?, observacoes = ?, itens_checklist = ?
+            WHERE id = ?
+        '''
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, (
+                dados['identificacao'],
+                dados['data'],
+                dados.get('horimetro'),
+                dados.get('nivel_oleo', 'ADEQUADO'),
+                dados.get('observacoes', ''),
+                dados.get('itens_checklist', ''),
+                id
+            ))
+            conn.commit()
+            conn.close()
+            
+            return jsonify({'success': True})
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 400
+    
+    elif request.method == 'DELETE':
+        # Excluir checklist
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM checklists WHERE id = ?", (id,))
+            conn.commit()
+            conn.close()
+            
+            if cursor.rowcount > 0:
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Checklist não encontrado'}), 404
+        except Exception as e:
+            conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 400
+
 @app.route('/medias-veiculos')
 def medias_veiculos():
     try:
@@ -422,14 +551,45 @@ def metricas_uso():
     """Página de métricas de uso e controle de troca de óleo"""
     if request.method == 'POST':
         try:
-            placa = request.form.get('placa').upper()
+            identificacao = request.form.get('identificacao')
+            tipo = request.form.get('tipo')
             data_troca = request.form.get('data_troca')
-            km_troca = float(request.form.get('km_troca'))
             
-            if salvar_troca_oleo(placa, data_troca, km_troca):
-                flash('Dados de troca de óleo salvos com sucesso!', 'success')
+            # Verificar se é uma atualização (tem identificacao_original)
+            identificacao_original = request.form.get('identificacao_original')
+            tipo_original = request.form.get('tipo_original')
+            
+            if identificacao_original and tipo_original:
+                # É uma atualização
+                if tipo == 'veiculo':
+                    km_troca = float(request.form.get('km_troca'))
+                    horimetro_troca = None
+                else:  # maquina
+                    km_troca = None
+                    horimetro_troca = float(request.form.get('horimetro_troca'))
+                
+                # Primeiro exclui o registro antigo se a identificação ou tipo mudou
+                if identificacao != identificacao_original or tipo != tipo_original:
+                    excluir_troca_oleo(identificacao_original, tipo_original)
+                
+                # Agora salva o novo registro
+                if salvar_troca_oleo(identificacao, tipo, data_troca, km_troca, horimetro_troca):
+                    flash('Troca de óleo atualizada com sucesso!', 'success')
+                else:
+                    flash('Erro ao atualizar troca de óleo', 'danger')
             else:
-                flash('Erro ao salvar dados de troca de óleo', 'danger')
+                # É um novo registro
+                if tipo == 'veiculo':
+                    km_troca = float(request.form.get('km_troca'))
+                    horimetro_troca = None
+                else:  # maquina
+                    km_troca = None
+                    horimetro_troca = float(request.form.get('horimetro_troca'))
+                
+                if salvar_troca_oleo(identificacao, tipo, data_troca, km_troca, horimetro_troca):
+                    flash('Dados de troca de óleo salvos com sucesso!', 'success')
+                else:
+                    flash('Erro ao salvar dados de troca de óleo', 'danger')
             
         except Exception as e:
             flash(f'Erro ao salvar dados: {str(e)}', 'danger')
@@ -439,11 +599,50 @@ def metricas_uso():
     # Obter dados para exibição
     trocas_oleo = obter_trocas_oleo()
     placas = obter_placas_veiculos()
+    identificacoes_equipamentos = obter_identificacoes_equipamentos()
     
     return render_template('metricas_uso.html', 
                          trocas_oleo=trocas_oleo,
                          placas=placas,
+                         identificacoes_equipamentos=identificacoes_equipamentos,
                          active_page='metricas')
+
+@app.route('/api/troca-oleo/<identificacao>/<tipo>', methods=['GET'])
+def api_obter_troca_oleo(identificacao, tipo):
+    """API para obter dados de uma troca de óleo específica"""
+    try:
+        troca = obter_troca_oleo_por_identificacao_tipo(identificacao, tipo)
+        if troca:
+            return jsonify({'success': True, 'data': troca})
+        return jsonify({'success': False, 'error': 'Registro não encontrado'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/trocas-oleo/<identificacao>/<tipo>', methods=['DELETE'])
+def api_excluir_troca_oleo(identificacao, tipo):
+    """API para excluir uma troca de óleo"""
+    try:
+        if excluir_troca_oleo(identificacao, tipo):
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Registro não encontrado'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/checklists/<identificacao>')
+def api_checklists_por_identificacao(identificacao):
+    """API para obter checklists relacionados a uma identificação"""
+    try:
+        checklists = obter_checklists_por_identificacao(identificacao)
+        return jsonify({
+            'success': True,
+            'checklists': checklists,
+            'identificacao': identificacao
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/reajuste-combustiveis', methods=['GET', 'POST'])
 def reajuste_combustiveis():

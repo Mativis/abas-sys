@@ -80,6 +80,44 @@
             border-radius: 2px;
         }
 
+        .nav-group-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            padding: 0.5rem 1rem;
+            margin-top: 1rem;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-group {
+            border-left: 3px solid var(--primary);
+            padding-left: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .dropdown-menu {
+            border-radius: 12px;
+            box-shadow: var(--hover-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+        }
+
+        .dropdown-item {
+            border-radius: 8px;
+            margin: 0.2rem 0.5rem;
+            width: auto;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .dropdown-divider {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
         .card {
             border: none;
             border-radius: 16px;
@@ -229,6 +267,18 @@
             .container {
                 padding: 0 1rem;
             }
+
+            .nav-group-title {
+                text-align: center;
+                margin-top: 1.5rem;
+            }
+
+            .nav-group {
+                border-left: none;
+                border-top: 3px solid var(--primary);
+                padding-left: 0;
+                padding-top: 0.5rem;
+            }
         }
 
         /* Animações */
@@ -319,26 +369,56 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <div class="navbar-nav ms-auto">
-                    <a class="nav-link {{ 'active' if active_page == 'index' }}" href="/">
-                        <i class="bi bi-house me-1"></i> Início
-                    </a>
-                    <a class="nav-link {{ 'active' if active_page == 'relatorios' }}" href="/relatorios">
-                        <i class="bi bi-bar-chart me-1"></i> Relatórios
-                    </a>
-                    <a class="nav-link {{ 'active' if active_page == 'manutencoes' }}" href="/manutencoes">
-                        <i class="bi bi-tools me-1"></i> Manutenções
-                    </a>
-                    <a class="nav-link {{ 'active' if active_page == 'medias' }}" href="/medias-veiculos">
-                        <i class="bi bi-speedometer me-1"></i> Médias
-                    </a>
-                    <a class="nav-link {{ 'active' if active_page == 'metricas' }}" href="/metricas-uso">
-                        <i class="bi bi-gear me-1"></i> Métricas
-                    </a>
-                    <a class="nav-link {{ 'active' if active_page == 'combustiveis' }}" href="/reajuste-combustiveis">
-                        <i class="bi bi-fuel-pump me-1"></i> Combustíveis
-                    </a>
-                </div>
+                <ul class="navbar-nav ms-auto">
+                    <!-- Início -->
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if active_page == 'index' }}" href="/">
+                            <i class="bi bi-house me-1"></i> Início
+                        </a>
+                    </li>
+
+                    <!-- Abastecimento -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ 'active' if active_group == 'abastecimento' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-fuel-pump me-1"></i> Abastecimento
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li class="nav-group-title">Abastecimento</li>
+                            <li class="nav-group">
+                                <a class="dropdown-item {{ 'active' if active_page == 'relatorios' }}" href="/relatorios">
+                                    <i class="bi bi-bar-chart me-2"></i> Relatório
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'medias' }}" href="/medias-veiculos">
+                                    <i class="bi bi-speedometer2 me-2"></i> Média
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'combustiveis' }}" href="/reajuste-combustiveis">
+                                    <i class="bi bi-droplet me-2"></i> Combustíveis
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Manutenção -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ 'active' if active_group == 'manutencao' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-tools me-1"></i> Manutenção
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li class="nav-group-title">Manutenção</li>
+                            <li class="nav-group">
+                                <a class="dropdown-item {{ 'active' if active_page == 'manutencoes' }}" href="/manutencoes">
+                                    <i class="bi bi-wrench me-2"></i> Manutenções
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'metricas' }}" href="/metricas-uso">
+                                    <i class="bi bi-speedometer me-2"></i> Métricas
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'checklists' }}" href="/checklists">
+                                    <i class="bi bi-clipboard-check me-2"></i> Checklist
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
@@ -365,7 +445,7 @@
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         const tooltipList = tooltipTriggerList.map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
         
-        const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+        const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover']'));
         const popoverList = popoverTriggerList.map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
 
         // Efeitos de parallax suave
