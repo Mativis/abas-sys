@@ -6,9 +6,14 @@
         <div>
             <i class="bi bi-tools"></i> Controle de Manutenções
         </div>
-        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novaManutencaoModal">
-            <i class="bi bi-plus-circle"></i> Nova Manutenção
-        </button>
+        <div>
+            <button class="btn btn-light btn-sm me-2" onclick="imprimirRelatorioCompleto()" title="Imprimir Relatório">
+                <i class="bi bi-printer"></i> Relatório
+            </button>
+            <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novaManutencaoModal">
+                <i class="bi bi-plus-circle"></i> Nova Manutenção
+            </button>
+        </div>
     </div>
     <div class="card-body">
         <!-- Filtros -->
@@ -19,21 +24,21 @@
                     <input type="text" id="filtroIdentificacao" class="form-control" placeholder="Filtrar por identificação...">
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select id="filtroStatus" class="form-select">
                     <option value="todos">Todos os status</option>
                     <option value="aberto">Abertas</option>
                     <option value="finalizado">Finalizadas</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select id="filtroTipo" class="form-select">
                     <option value="todos">Todos os tipos</option>
                     <option value="corretiva">Corretiva</option>
                     <option value="preventiva">Preventiva</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select id="filtroFrota" class="form-select">
                     <option value="todos">Todas as frotas</option>
                     <option value="apoio">Apoio</option>
@@ -41,34 +46,45 @@
                     <option value="equipamento">Equipamento</option>
                 </select>
             </div>
+            <div class="col-md-3">
+                <select id="filtroPagamento" class="form-select">
+                    <option value="todos">Todas as formas de pagamento</option>
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="pix">PIX</option>
+                    <option value="cartao_credito">Cartão de Crédito</option>
+                    <option value="cartao_debito">Cartão de Débito</option>
+                    <option value="transferencia">Transferência</option>
+                    <option value="boleto">Boleto</option>
+                </select>
+            </div>
         </div>
 
         <!-- Cards de Resumo -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card text-center bg-primary text-white">
                     <div class="card-body">
                         <h5><i class="bi bi-tools"></i> Total</h5>
                         <h3 id="total-manutencoes">{{ total_manutencoes }}</h3>
-                        <small>Manutenções cadastradas</small>
+                        <small>Manutenções</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card text-center bg-warning text-dark">
                     <div class="card-body">
                         <h5><i class="bi bi-clock"></i> Abertas</h5>
                         <h3 id="total-abertas">{{ manutencoes_abertas }}</h3>
-                        <small>Manutenções em andamento</small>
+                        <small>Em andamento</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card text-center bg-success text-white">
                     <div class="card-body">
                         <h5><i class="bi bi-check-circle"></i> Finalizadas</h5>
                         <h3 id="total-finalizadas">{{ manutencoes_finalizadas }}</h3>
-                        <small>Manutenções concluídas</small>
+                        <small>Concluídas</small>
                     </div>
                 </div>
             </div>
@@ -78,6 +94,15 @@
                         <h5><i class="bi bi-currency-dollar"></i> Valor Total</h5>
                         <h3 id="valor-total">R$ {{ "%.2f"|format(valor_total) }}</h3>
                         <small>Total em manutenções</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-info text-white">
+                    <div class="card-body">
+                        <h5><i class="bi bi-calendar-check"></i> Próximas</h5>
+                        <h3 id="proximas-liberacao">0</h3>
+                        <small>Próximas da liberação</small>
                     </div>
                 </div>
             </div>
@@ -92,9 +117,10 @@
                         <th>Identificação</th>
                         <th>Tipo</th>
                         <th>Frota</th>
-                        <th>Descricao</th>
+                        <th>Descrição</th>
                         <th>Fornecedor</th>
                         <th class="text-end">Valor</th>
+                        <th>Pagamento</th>
                         <th class="text-center">Status</th>
                         <th class="text-center">Ações</th>
                     </tr>
@@ -114,6 +140,13 @@
                         <td>{{ manutencao.descricao[:50] }}{% if manutencao.descricao|length > 50 %}...{% endif %}</td>
                         <td>{{ manutencao.fornecedor or '-' }}</td>
                         <td class="text-end">R$ {{ "%.2f"|format(manutencao.valor) }}</td>
+                        <td>
+                            {% if manutencao.forma_pagamento %}
+                                {{ manutencao.forma_pagamento }}{% if manutencao.parcelas and manutencao.parcelas > 1 %} ({{ manutencao.parcelas }}x){% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td class="text-center">
                             <span class="badge {% if manutencao.finalizada %}bg-success{% else %}bg-warning{% endif %}">
                                 {{ 'Finalizada' if manutencao.finalizada else 'Em Aberto' }}
@@ -121,13 +154,13 @@
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-info" onclick="detalhesManutencao({{ manutencao.id }})" title="Detalhes">
+                                <button class="btn btn-outline-info" onclick="detalhesManutencao({ manutencao,id })" title="Detalhes">
                                     <i class="bi bi-eye"></i>
                                 </button>
-                                <button class="btn btn-outline-primary" onclick="editarManutencao({{ manutencao.id }})" title="Editar">
+                                <button class="btn btn-outline-primary" onclick="editarManutencao({ manutencao,id })" title="Editar">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" onclick="excluirManutencao({{ manutencao.id }})" title="Excluir">
+                                <button class="btn btn-outline-danger" onclick="excluirManutencao({ manutencao,id })" title="Excluir">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -135,7 +168,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center py-4">
+                        <td colspan="10" class="text-center py-4">
                             <i class="bi bi-inbox"></i>
                             <p class="text-muted">Nenhuma manutenção cadastrada.</p>
                         </td>
@@ -188,6 +221,28 @@
                         <div class="col-md-6">
                             <label class="form-label">Previsão de Conclusão</label>
                             <input type="date" class="form-control" name="previsao_conclusao">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Prazo para Liberação (dias úteis)</label>
+                            <input type="number" min="0" class="form-control" name="prazo_liberacao" 
+                                   placeholder="Ex: 5">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Forma de Pagamento</label>
+                            <select class="form-select" name="forma_pagamento">
+                                <option value="">Selecione...</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="pix">PIX</option>
+                                <option value="cartao_credito">Cartão de Crédito</option>
+                                <option value="cartao_debito">Cartão de Débito</option>
+                                <option value="transferencia">Transferência</option>
+                                <option value="boleto">Boleto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Parcelas</label>
+                            <input type="number" min="1" max="24" class="form-control" name="parcelas" 
+                                   placeholder="Nº de parcelas" value="1">
                         </div>
                         <div class="col-12">
                             <label class="form-label">Manutenção a Ser Realizada *</label>
@@ -264,6 +319,26 @@
                         <div class="col-md-6">
                             <label class="form-label">Previsão de Conclusão</label>
                             <input type="date" class="form-control" id="editar_previsao_conclusao">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Prazo para Liberação (dias úteis)</label>
+                            <input type="number" min="0" class="form-control" id="editar_prazo_liberacao">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Forma de Pagamento</label>
+                            <select class="form-select" id="editar_forma_pagamento">
+                                <option value="">Selecione...</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="pix">PIX</option>
+                                <option value="cartao_credito">Cartão de Crédito</option>
+                                <option value="cartao_debito">Cartão de Débito</option>
+                                <option value="transferencia">Transferência</option>
+                                <option value="boleto">Boleto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Parcelas</label>
+                            <input type="number" min="1" max="24" class="form-control" id="editar_parcelas" value="1">
                         </div>
                         <div class="col-12">
                             <label class="form-label">Manutenção a Ser Realizada *</label>
@@ -347,6 +422,23 @@ function carregarManutencoes() {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                         });
+                    
+                    // Calcular manutenções próximas da liberação
+                    const hoje = new Date();
+                    const proximas = manutencoes.filter(m => {
+                        if (m.finalizada || !m.prazo_liberacao || !m.data_abertura) return false;
+                        
+                        const dataAbertura = new Date(m.data_abertura);
+                        const dataLimite = new Date(dataAbertura);
+                        dataLimite.setDate(dataLimite.getDate() + m.prazo_liberacao);
+                        
+                        const diffTime = dataLimite - hoje;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        return diffDays <= 3 && diffDays >= 0;
+                    });
+                    
+                    document.getElementById('proximas-liberacao').textContent = proximas.length;
                 }
             } else {
                 manutencoes = [];
@@ -372,6 +464,9 @@ function configurarFiltros() {
     
     // Filtro de frota
     document.getElementById('filtroFrota').addEventListener('change', aplicarFiltros);
+    
+    // Filtro de forma de pagamento
+    document.getElementById('filtroPagamento').addEventListener('change', aplicarFiltros);
 }
 
 function configurarFormularios() {
@@ -392,7 +487,10 @@ function configurarFormularios() {
             previsao_conclusao: formData.get('previsao_conclusao') || '',
             data_conclusao: formData.get('data_conclusao') || '',
             observacoes: formData.get('observacoes') || '',
-            finalizada: false
+            finalizada: false,
+            prazo_liberacao: formData.get('prazo_liberacao') ? parseInt(formData.get('prazo_liberacao')) : null,
+            forma_pagamento: formData.get('forma_pagamento') || '',
+            parcelas: formData.get('parcelas') ? parseInt(formData.get('parcelas')) : 1
         };
 
         fetch('/api/manutencoes', {
@@ -425,6 +523,7 @@ function aplicarFiltros() {
     const filtroStatus = document.getElementById('filtroStatus').value;
     const filtroTipo = document.getElementById('filtroTipo').value;
     const filtroFrota = document.getElementById('filtroFrota').value;
+    const filtroPagamento = document.getElementById('filtroPagamento').value;
     
     let dadosFiltrados = manutencoes.filter(manutencao => {
         // Filtro por identificação
@@ -448,6 +547,11 @@ function aplicarFiltros() {
             return false;
         }
         
+        // Filtro por forma de pagamento
+        if (filtroPagamento !== 'todos' && manutencao.forma_pagamento !== filtroPagamento) {
+            return false;
+        }
+        
         return true;
     });
     
@@ -460,7 +564,7 @@ function atualizarTabela(dados) {
     if (dados.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="text-center py-4">
+                <td colspan="10" class="text-center py-4">
                     <i class="bi bi-inbox"></i>
                     <p class="text-muted">Nenhuma manutenção encontrada com os filtros aplicados.</p>
                 </td>
@@ -479,6 +583,10 @@ function atualizarTabela(dados) {
             'equipamento': 'Equipamento'
         }[manutencao.frota] || manutencao.frota;
         
+        const pagamentoFormatado = manutencao.forma_pagamento ? 
+            `${manutencao.forma_pagamento}${manutencao.parcelas && manutencao.parcelas > 1 ? ` (${manutencao.parcelas}x)` : ''}` : 
+            '-';
+        
         html += `
             <tr id="row-${manutencao.id}">
                 <td>${manutencao.id}</td>
@@ -488,6 +596,7 @@ function atualizarTabela(dados) {
                 <td>${manutencao.descricao.substring(0, 50)}${manutencao.descricao.length > 50 ? '...' : ''}</td>
                 <td>${manutencao.fornecedor || '-'}</td>
                 <td class="text-end">${valorFormatado}</td>
+                <td>${pagamentoFormatado}</td>
                 <td class="text-center">
                     <span class="badge ${manutencao.finalizada ? 'bg-success' : 'bg-warning'}">
                         ${manutencao.finalizada ? 'Finalizada' : 'Em Aberto'}
@@ -535,6 +644,9 @@ function editarManutencao(id) {
             document.getElementById('editar_data_conclusao').value = manutencao.data_conclusao || '';
             document.getElementById('editar_observacoes').value = manutencao.observacoes || '';
             document.getElementById('editar_finalizada').checked = manutencao.finalizada;
+            document.getElementById('editar_prazo_liberacao').value = manutencao.prazo_liberacao || '';
+            document.getElementById('editar_forma_pagamento').value = manutencao.forma_pagamento || '';
+            document.getElementById('editar_parcelas').value = manutencao.parcelas || 1;
             
             // Abrir o modal
             new bootstrap.Modal(document.getElementById('editarManutencaoModal')).show();
@@ -559,7 +671,12 @@ function salvarEdicao() {
         previsao_conclusao: document.getElementById('editar_previsao_conclusao').value || '',
         data_conclusao: document.getElementById('editar_data_conclusao').value || '',
         observacoes: document.getElementById('editar_observacoes').value || '',
-        finalizada: document.getElementById('editar_finalizada').checked
+        finalizada: document.getElementById('editar_finalizada').checked,
+        prazo_liberacao: document.getElementById('editar_prazo_liberacao').value ? 
+                         parseInt(document.getElementById('editar_prazo_liberacao').value) : null,
+        forma_pagamento: document.getElementById('editar_forma_pagamento').value || '',
+        parcelas: document.getElementById('editar_parcelas').value ? 
+                 parseInt(document.getElementById('editar_parcelas').value) : 1
     };
 
     fetch(`/api/manutencoes/${id}`, {
@@ -590,7 +707,7 @@ function detalhesManutencao(id) {
         .then(response => response.json())
         .then(manutencao => {
             if (manutencao.error) {
-                showAlert('Erro ao carregar detalhes: ' + manutencao.error, 'danger');
+                showAlert('Erro ao carregar manutenção: ' + manutencao.error, 'danger');
                 return;
             }
             
@@ -601,113 +718,100 @@ function detalhesManutencao(id) {
                 'equipamento': 'Equipamento'
             }[manutencao.frota] || manutencao.frota;
             
-            const valorFormatado = 'R$ ' + (manutencao.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const valorFormatado = 'R$ ' + (manutencao.valor || 0).toLocaleString('pt-BR', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+            });
+            
+            const pagamentoFormatado = manutencao.forma_pagamento ? 
+                `${manutencao.forma_pagamento}${manutencao.parcelas && manutencao.parcelas > 1 ? ` (${manutencao.parcelas}x)` : ''}` : 
+                'Não informado';
+            
+            let prazoInfo = 'Não informado';
+            if (manutencao.prazo_liberacao) {
+                const dataAbertura = new Date(manutencao.data_abertura);
+                const dataLimite = new Date(dataAbertura);
+                dataLimite.setDate(dataLimite.getDate() + manutencao.prazo_liberacao);
+                
+                prazoInfo = `${manutencao.prazo_liberacao} dias úteis (até ${dataLimite.toLocaleDateString('pt-BR')})`;
+            }
             
             const html = `
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="card mb-3">
-                            <div class="card-header bg-primary text-white">
-                                <i class="bi bi-info-circle"></i> Informações da Manutenção
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>ID:</strong></div>
-                                    <div class="col-7">${manutencao.id}</div>
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Identificação:</strong></div>
-                                    <div class="col-7">${manutencao.identificacao}</div>
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Tipo:</strong></div>
-                                    <div class="col-7">${tipoFormatado}</div>
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Frota:</strong></div>
-                                    <div class="col-7">${frotaFormatada}</div>
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Status:</strong></div>
-                                    <div class="col-7">
-                                        <span class="badge ${manutencao.finalizada ? 'bg-success' : 'bg-warning'}">
-                                            ${manutencao.finalizada ? 'Finalizada' : 'Em Aberto'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <h6>Identificação</h6>
+                        <p>${manutencao.identificacao}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Tipo</h6>
+                        <p>${tipoFormatado}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Frota</h6>
+                        <p>${frotaFormatada}</p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Descrição</h6>
+                        <p>${manutencao.descricao}</p>
                     </div>
                     <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <i class="bi bi-calendar"></i> Datas
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Abertura:</strong></div>
-                                    <div class="col-7">${formatarData(manutencao.data_abertura)}</div>
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Previsão:</strong></div>
-                                    <div class="col-7">${manutencao.previsao_conclusao ? formatarData(manutencao.previsao_conclusao) : '-'}</div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-5"><strong>Conclusão:</strong></div>
-                                    <div class="col-7">${manutencao.data_conclusao ? formatarData(manutencao.data_conclusao) : '-'}</div>
-                                </div>
-                            </div>
-                        </div>
+                        <h6>Fornecedor</h6>
+                        <p>${manutencao.fornecedor || 'Não informado'}</p>
                     </div>
                 </div>
                 
-                <div class="row mt-3">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Valor</h6>
+                        <p>${valorFormatado}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Forma de Pagamento</h6>
+                        <p>${pagamentoFormatado}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Prazo para Liberação</h6>
+                        <p>${prazoInfo}</p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Data de Abertura</h6>
+                        <p>${new Date(manutencao.data_abertura).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Previsão de Conclusão</h6>
+                        <p>${manutencao.previsao_conclusao ? new Date(manutencao.previsao_conclusao).toLocaleDateString('pt-BR') : 'Não informada'}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Data de Conclusão</h6>
+                        <p>${manutencao.data_conclusao ? new Date(manutencao.data_conclusao).toLocaleDateString('pt-BR') : 'Não concluída'}</p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h6>Observações</h6>
+                        <p>${manutencao.observacoes || 'Nenhuma observação registrada'}</p>
+                    </div>
+                </div>
+                
+                <div class="row">
                     <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <i class="bi bi-currency-dollar"></i> Financeiro
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-2">
-                                    <div class="col-5"><strong>Fornecedor:</strong></div>
-                                    <div class="col-7">${manutencao.fornecedor || '-'}</div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-5"><strong>Valor:</strong></div>
-                                    <div class="col-7 fw-bold">${valorFormatado}</div>
-                                </div>
-                            </div>
-                        </div>
+                        <h6>Status</h6>
+                        <span class="badge ${manutencao.finalizada ? 'bg-success' : 'bg-warning'}">
+                            ${manutencao.finalizada ? 'Finalizada' : 'Em Aberto'}
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Data de Registro</h6>
+                        <p>${new Date(manutencao.data_registro).toLocaleDateString('pt-BR')}</p>
                     </div>
                 </div>
-                
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-secondary text-white">
-                                <i class="bi bi-card-text"></i> Descrição
-                            </div>
-                            <div class="card-body">
-                                <p>${manutencao.descricao}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                ${manutencao.observacoes ? `
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-light">
-                                <i class="bi bi-chat"></i> Observações
-                            </div>
-                            <div class="card-body">
-                                <p>${manutencao.observacoes}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
             `;
             
             document.getElementById('detalhesConteudo').innerHTML = html;
@@ -720,91 +824,344 @@ function detalhesManutencao(id) {
 }
 
 function excluirManutencao(id) {
-    if (confirm('Tem certeza que deseja excluir esta manutenção?')) {
-        fetch(`/api/manutencoes/${id}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showAlert('Manutenção excluída com sucesso!', 'success');
-                carregarManutencoes(); // Recarregar dados
-            } else {
-                showAlert('Erro ao excluir manutenção: ' + data.error, 'danger');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showAlert('Erro ao excluir manutenção', 'danger');
-        });
+    if (!confirm('Tem certeza que deseja excluir esta manutenção?')) {
+        return;
     }
+    
+    fetch(`/api/manutencoes/${id}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Manutenção excluída com sucesso!', 'success');
+            carregarManutencoes(); // Recarregar dados
+        } else {
+            showAlert('Erro ao excluir manutenção: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Erro ao excluir manutenção', 'danger');
+    });
 }
 
 function imprimirManutencao() {
-    window.print();
+    const conteudo = document.getElementById('detalhesConteudo').innerHTML;
+    const janelaImpressao = window.open('', '_blank');
+    
+    janelaImpressao.document.write(`
+        <html>
+        <head>
+            <title>Relatório de Manutenção</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h4 { color: #0d6efd; margin-bottom: 20px; }
+                .info-label { font-weight: bold; color: #6c757d; }
+                @media print {
+                    body { padding: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <h4>Relatório de Manutenção</h4>
+                    </div>
+                    <div class="col-6 text-end">
+                        <small>Emitido em: ${new Date().toLocaleDateString('pt-BR')}</small>
+                    </div>
+                </div>
+                ${conteudo}
+            </div>
+            <div class="mt-4 no-print text-center">
+                <button class="btn btn-primary" onclick="window.print()">Imprimir</button>
+                <button class="btn btn-secondary" onclick="window.close()">Fechar</button>
+            </div>
+        </body>
+        </html>
+    `);
+    
+    janelaImpressao.document.close();
 }
 
-function formatarData(dataString) {
-    if (!dataString) return '-';
-    const data = new Date(dataString);
-    return data.toLocaleDateString('pt-BR');
+function imprimirRelatorioCompleto() {
+    // Calcular totais
+    const totalValor = manutencoes.reduce((sum, m) => sum + (m.valor || 0), 0);
+    const totalPrazoLiberacao = manutencoes.reduce((sum, m) => sum + (m.prazo_liberacao || 0), 0);
+    const totalManutencoes = manutencoes.length;
+    const manutencoesAbertas = manutencoes.filter(m => !m.finalizada).length;
+    const manutencoesFinalizadas = manutencoes.filter(m => m.finalizada).length;
+
+    // Filtrar manutenções a serem feitas (em aberto)
+    const manutencoesPendentes = manutencoes.filter(m => !m.finalizada);
+    const manutencoesConcluidas = manutencoes.filter(m => m.finalizada);
+
+    // Agrupar por tipo
+    const porTipo = {
+        corretiva: manutencoes.filter(m => m.tipo === 'corretiva').length,
+        preventiva: manutencoes.filter(m => m.tipo === 'preventiva').length
+    };
+
+    // Agrupar por frota
+    const porFrota = {};
+    manutencoes.forEach(m => {
+        porFrota[m.frota] = (porFrota[m.frota] || 0) + 1;
+    });
+
+    // Formatar dados para impressão
+    const dataEmissao = new Date().toLocaleDateString('pt-BR');
+    const horaEmissao = new Date().toLocaleTimeString('pt-BR');
+    
+    const conteudoRelatorio = `
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col-12 text-center">
+                    <h2>Relatório Completo de Manutenções</h2>
+                    <p class="mb-0"><strong>Data de emissão:</strong> ${dataEmissao} às ${horaEmissao}</p>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Resumo Geral</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Total de Manutenções: <strong>${totalManutencoes}</strong></p>
+                            <p>Valor Total: <strong>R$ ${totalValor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></p>
+                            <p>Prazo Total p/ Liberação: <strong>${totalPrazoLiberacao} dias</strong></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">Status das Manutenções</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Em Aberto: <strong>${manutencoesAbertas}</strong></p>
+                            <p>Finalizadas: <strong>${manutencoesFinalizadas}</strong></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">Distribuição por Tipo</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Corretivas: <strong>${porTipo.corretiva}</strong></p>
+                            <p>Preventivas: <strong>${porTipo.preventiva}</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Distribuição por Frota</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                ${Object.entries(porFrota).map(([frota, quantidade]) => `
+                                    <div class="col-md-3">
+                                        <p>${frota.charAt(0).toUpperCase() + frota.slice(1)}: <strong>${quantidade}</strong></p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <h4 class="text-center mb-3">Manutenções Pendentes (A Serem Feitas)</h4>
+                    ${manutencoesPendentes.length > 0 ? `
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-warning">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Identificação</th>
+                                    <th>Tipo</th>
+                                    <th>Frota</th>
+                                    <th>Descrição</th>
+                                    <th>Fornecedor</th>
+                                    <th>Valor (R$)</th>
+                                    <th>Prazo (dias)</th>
+                                    <th>Data Previsão</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${manutencoesPendentes.map(m => {
+                                    const dataAbertura = new Date(m.data_abertura);
+                                    const dataPrevisao = m.previsao_conclusao ? new Date(m.previsao_conclusao) : null;
+                                    const hoje = new Date();
+                                    
+                                    let statusPrazo = '';
+                                    if (dataPrevisao) {
+                                        const diffTime = dataPrevisao - hoje;
+                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                        
+                                        if (diffDays < 0) {
+                                            statusPrazo = '<span class="badge bg-danger">Atrasada</span>';
+                                        } else if (diffDays <= 7) {
+                                            statusPrazo = '<span class="badge bg-warning text-dark">Próxima</span>';
+                                        } else {
+                                            statusPrazo = '<span class="badge bg-success">No prazo</span>';
+                                        }
+                                    }
+                                    
+                                    return `
+                                        <tr>
+                                            <td>${m.id}</td>
+                                            <td>${m.identificacao}</td>
+                                            <td>${m.tipo === 'corretiva' ? 'Corretiva' : 'Preventiva'}</td>
+                                            <td>${m.frota}</td>
+                                            <td>${m.descricao}</td>
+                                            <td>${m.fornecedor || '-'}</td>
+                                            <td>R$ ${(m.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                            <td>${m.prazo_liberacao || '-'}</td>
+                                            <td>${dataPrevisao ? dataPrevisao.toLocaleDateString('pt-BR') + ' ' + statusPrazo : 'Não informada'}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p class="text-center">Nenhuma manutenção pendente.</p>'}
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h4 class="text-center mb-3">Todas as Manutenções</h4>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Identificação</th>
+                                <th>Tipo</th>
+                                <th>Frota</th>
+                                <th>Valor (R$)</th>
+                                <th>Prazo (dias)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${manutencoes.map(m => `
+                                <tr>
+                                    <td>${m.id}</td>
+                                    <td>${m.identificacao}</td>
+                                    <td>${m.tipo === 'corretiva' ? 'Corretiva' : 'Preventiva'}</td>
+                                    <td>${m.frota}</td>
+                                    <td>R$ ${(m.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                    <td>${m.prazo_liberacao || '-'}</td>
+                                    <td>${m.finalizada ? 'Finalizada' : 'Em Aberto'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot class="table-secondary">
+                            <tr>
+                                <td colspan="4" class="text-end"><strong>TOTAIS:</strong></td>
+                                <td><strong>R$ ${totalValor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                                <td><strong>${totalPrazoLiberacao}</strong></td>
+                                <td><strong>${totalManutencoes} manutenções</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Abrir janela de impressão
+    const janelaImpressao = window.open('', '_blank');
+    
+    janelaImpressao.document.write(`
+        <html>
+        <head>
+            <title>Relatório Completo de Manutenções</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                @page {
+                    size: landscape;
+                    margin: 1cm;
+                }
+                body { 
+                    font-family: Arial, sans-serif; 
+                    font-size: 12px;
+                    padding: 15px;
+                }
+                h2 { 
+                    color: #0d6efd; 
+                    font-size: 1.5rem;
+                }
+                h4, h5 {
+                    font-size: 1.1rem;
+                }
+                .table { 
+                    font-size: 11px;
+                    page-break-inside: avoid;
+                }
+                .card {
+                    page-break-inside: avoid;
+                }
+                .badge {
+                    font-size: 10px;
+                }
+                @media print {
+                    body { 
+                        padding: 0; 
+                        margin: 0;
+                    }
+                    .no-print { 
+                        display: none; 
+                    }
+                    .container-fluid {
+                        width: 100%;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            ${conteudoRelatorio}
+            <div class="no-print text-center mt-4">
+                <button class="btn btn-primary" onclick="window.print()">Imprimir</button>
+                <button class="btn btn-secondary" onclick="window.close()">Fechar</button>
+            </div>
+        </body>
+        </html>
+    `);
+    
+    janelaImpressao.document.close();
 }
 
 function showAlert(message, type) {
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '1050';
+    alertDiv.style.minWidth = '300px';
     alertDiv.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     
-    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.navbar').nextElementSibling);
+    document.body.appendChild(alertDiv);
     
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
         }
-    }, 3000);
+    }, 5000);
 }
 </script>
-
-<style>
-.grafico-container {
-    position: relative;
-    height: 300px;
-}
-
-.card {
-    transition: transform 0.2s;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(0, 123, 255, 0.1);
-}
-
-.badge {
-    font-size: 0.85em;
-}
-
-@media print {
-    .no-print {
-        display: none !important;
-    }
-    
-    .modal-dialog {
-        max-width: none;
-        margin: 0;
-    }
-    
-    .modal-content {
-        border: none;
-        height: auto;
-        min-height: 100vh;
-    }
-}
-</style>
 {% endblock %}

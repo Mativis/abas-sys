@@ -370,15 +370,15 @@
 
 <script>
 // Variáveis globais
-let dadosTrocas = {{ trocas_oleo|tojson }};
+let dadosTrocas = { trocas_oleo|tojson };
 let modoEdicao = false;
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     // Configurar gráfico
-    const vencidos = {{ trocas_oleo|selectattr('status', 'equalto', 'VENCIDO')|list|length }};
-    const atencao = {{ trocas_oleo|selectattr('status', 'equalto', 'ATENÇÃO')|list|length }};
-    const emDia = {{ trocas_oleo|selectattr('status', 'equalto', 'OK')|list|length }};
+    const vencidos = { trocas_oleo|selectattr('status', 'equalto', 'VENCIDO')|list|length };
+    const atencao = { trocas_oleo|selectattr('status', 'equalto', 'ATENÇÃO')|list|length };
+    const emDia = { trocas_oleo|selectattr('status', 'equalto', 'OK')|list|length };
     
     const ctx = document.getElementById('statusChart').getContext('2d');
     new Chart(ctx, {

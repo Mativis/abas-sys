@@ -70,7 +70,7 @@ def criar_tabelas():
     )
     ''')
     
-    # Tabela de manutenções
+    # Tabela de manutenções (ATUALIZADA COM NOVOS CAMPOS)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS manutencoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,6 +85,9 @@ def criar_tabelas():
         data_conclusao TEXT,
         observacoes TEXT,
         finalizada BOOLEAN DEFAULT 0,
+        prazo_liberacao INTEGER,           -- NOVO CAMPO: prazo em dias úteis
+        forma_pagamento TEXT,              -- NOVO CAMPO: forma de pagamento
+        parcelas INTEGER DEFAULT 1,        -- NOVO CAMPO: número de parcelas
         data_registro TEXT DEFAULT CURRENT_TIMESTAMP
     )
     ''')
@@ -129,6 +132,23 @@ def criar_tabelas():
         cursor.execute('ALTER TABLE trocas_oleo_temp RENAME TO trocas_oleo')
         
         print("Estrutura da tabela trocas_oleo atualizada com sucesso!")
+    
+    # Verificar e atualizar a estrutura da tabela manutencoes se necessário
+    cursor.execute("PRAGMA table_info(manutencoes)")
+    colunas_manutencao = [coluna[1] for coluna in cursor.fetchall()]
+    
+    # Adicionar novos campos se não existirem
+    if 'prazo_liberacao' not in colunas_manutencao:
+        cursor.execute('ALTER TABLE manutencoes ADD COLUMN prazo_liberacao INTEGER')
+        print("Campo 'prazo_liberacao' adicionado à tabela manutencoes.")
+    
+    if 'forma_pagamento' not in colunas_manutencao:
+        cursor.execute('ALTER TABLE manutencoes ADD COLUMN forma_pagamento TEXT')
+        print("Campo 'forma_pagamento' adicionado à tabela manutencoes.")
+    
+    if 'parcelas' not in colunas_manutencao:
+        cursor.execute('ALTER TABLE manutencoes ADD COLUMN parcelas INTEGER DEFAULT 1')
+        print("Campo 'parcelas' adicionado à tabela manutencoes.")
     
     # Valores padrão para combustíveis
     cursor.execute("SELECT COUNT(*) FROM precos_combustivel")
@@ -903,5 +923,166 @@ def excluir_troca_oleo(identificacao, tipo):
     except Exception as e:
         print(f"Erro ao excluir troca de óleo: {e}")
         return False
+    finally:
+        conn.close()
+
+# NOVAS FUNÇÕES PARA MANUTENÇÕES
+def obter_manutencoes():
+    """Obtém todas as manutenções"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
+        df = pd.read_sql(query, conn)
+        return df.to_dict('records')
+    except Exception as e:
+        print(f"Erro ao obter manutenções: {e}")
+        return []
+    finally:
+        conn.close()
+
+def obter_manutencao_por_id(id):
+    """Obtém uma manutenção específica pelo ID"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        query = "SELECT * FROM manutencoes WHERE id = ?"
+        df = pd.read_sql(query, conn, params=(id,))
+        if not df.empty:
+            return df.iloc[0].to_dict()
+        return None
+    except Exception as e:
+        print(f"Erro ao obter manutenção: {e}")
+        return None
+    finally:
+        conn.close()
+
+def criar_manutencao(dados):
+    """Cria uma nova manutenção"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    query = """
+    INSERT INTO manutencoes (
+        identificacao, tipo, frota, descricao, fornecedor, valor, 
+        data_abertura, previsao_conclusao, data_conclusao, observacoes, 
+        finalizada, prazo_liberacao, forma_pagamento, parcelas
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    
+    try:
+        cursor.execute(query, (
+            dados['identificacao'],
+            dados['tipo'],
+            dados['frota'],
+            dados['descricao'],
+            dados.get('fornecedor', ''),
+            dados.get('valor', 0),
+            dados['data_abertura'],
+            dados.get('previsao_conclusao', ''),
+            dados.get('data_conclusao', ''),
+            dados.get('observacoes', ''),
+            dados.get('finalizada', False),
+            dados.get('prazo_liberacao'),
+            dados.get('forma_pagamento', ''),
+            dados.get('parcelas', 1)
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        print(f"Erro ao criar manutenção: {e}")
+        return False
+    finally:
+        conn.close()
+
+def atualizar_manutencao(id, dados):
+    """Atualiza uma manutenção existente"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    query = """
+    UPDATE manutencoes SET
+        identificacao = ?, tipo = ?, frota = ?, descricao = ?, 
+        fornecedor = ?, valor = ?, data_abertura = ?, 
+        previsao_conclusao = ?, data_conclusao = ?, 
+        observacoes = ?, finalizada = ?, prazo_liberacao = ?,
+        forma_pagamento = ?, parcelas = ?
+    WHERE id = ?
+    """
+    
+    try:
+        cursor.execute(query, (
+            dados['identificacao'],
+            dados['tipo'],
+            dados['frota'],
+            dados['descricao'],
+            dados.get('fornecedor', ''),
+            dados.get('valor', 0),
+            dados['data_abertura'],
+            dados.get('previsao_conclusao', ''),
+            dados.get('data_conclusao', ''),
+            dados.get('observacoes', ''),
+            dados.get('finalizada', False),
+            dados.get('prazo_liberacao'),
+            dados.get('forma_pagamento', ''),
+            dados.get('parcelas', 1),
+            id
+        ))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao atualizar manutenção: {e}")
+        return False
+    finally:
+        conn.close()
+
+def excluir_manutencao(id):
+    """Exclui uma manutenção pelo ID"""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DELETE FROM manutencoes WHERE id = ?", (id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao excluir manutenção: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_estatisticas_manutencoes():
+    """Obtém estatísticas das manutenções"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) as total FROM manutencoes")
+        total = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) as abertas FROM manutencoes WHERE finalizada = 0")
+        abertas = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) as finalizadas FROM manutencoes WHERE finalizada = 1")
+        finalizadas = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT SUM(valor) as valor_total FROM manutencoes")
+        valor_total = cursor.fetchone()[0] or 0
+        
+        return {
+            'total': total,
+            'abertas': abertas,
+            'finalizadas': finalizadas,
+            'valor_total': valor_total
+        }
+    except Exception as e:
+        print(f"Erro ao obter estatísticas de manutenções: {e}")
+        return {
+            'total': 0,
+            'abertas': 0,
+            'finalizadas': 0,
+            'valor_total': 0
+        }
     finally:
         conn.close()

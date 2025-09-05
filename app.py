@@ -33,7 +33,14 @@ from database import (
     obter_checklists_por_identificacao,
     excluir_troca_oleo,
     obter_troca_oleo_por_identificacao_tipo,
-    atualizar_troca_oleo
+    atualizar_troca_oleo,
+    # NOVAS FUNÇÕES PARA MANUTENÇÕES
+    obter_manutencoes,
+    obter_manutencao_por_id,
+    criar_manutencao,
+    atualizar_manutencao,
+    excluir_manutencao,
+    obter_estatisticas_manutencoes
 )
 
 app = Flask(__name__)
@@ -209,34 +216,18 @@ def manutencoes():
     """Página de gerenciamento de manutenções"""
     try:
         # Buscar manutenções
-        query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
-        conn = sqlite3.connect('abastecimentos.db')
-        df = pd.read_sql(query, conn)
-        manutencoes = df.to_dict('records')
+        manutencoes = obter_manutencoes()
         
-        # Estatísticas para a página
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM manutencoes")
-        total_manutencoes = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 0")
-        manutencoes_abertas = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 1")
-        manutencoes_finalizadas = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT SUM(valor) FROM manutencoes")
-        valor_total = cursor.fetchone()[0] or 0
-        
-        conn.close()
+        # Obter estatísticas
+        estatisticas = obter_estatisticas_manutencoes()
         
         return render_template('manutencoes.html', 
                              active_page='manutencoes',
                              manutencoes=manutencoes,
-                             total_manutencoes=total_manutencoes,
-                             manutencoes_abertas=manutencoes_abertas,
-                             manutencoes_finalizadas=manutencoes_finalizadas,
-                             valor_total=valor_total)
+                             total_manutencoes=estatisticas['total'],
+                             manutencoes_abertas=estatisticas['abertas'],
+                             manutencoes_finalizadas=estatisticas['finalizadas'],
+                             valor_total=estatisticas['valor_total'])
     except Exception as e:
         flash(f'Erro ao carregar manutenções: {str(e)}', 'danger')
         return render_template('manutencoes.html', 
@@ -250,147 +241,66 @@ def manutencoes():
 @app.route('/api/manutencoes', methods=['GET', 'POST'])
 def api_manutencoes():
     """API para gerenciar manutenções"""
-    conn = sqlite3.connect('abastecimentos.db')
     
     if request.method == 'GET':
         # Retornar lista de manutenções
         try:
-            query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
-            df = pd.read_sql(query, conn)
-            
-            # Calcular estatísticas
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM manutencoes")
-            total = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 0")
-            abertas = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM manutencoes WHERE finalizada = 1")
-            finalizadas = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT SUM(valor) FROM manutencoes")
-            valor_total = cursor.fetchone()[0] or 0
-            
-            conn.close()
+            manutencoes = obter_manutencoes()
+            estatisticas = obter_estatisticas_manutencoes()
             
             return jsonify({
-                'manutencoes': df.to_dict('records'),
-                'estatisticas': {
-                    'total': total,
-                    'abertas': abertas,
-                    'finalizadas': finalizadas,
-                    'valor_total': valor_total
-                }
+                'manutencoes': manutencoes,
+                'estatisticas': estatisticas
             })
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 500
     
     elif request.method == 'POST':
         # Criar nova manutenção
         dados = request.get_json()
         
-        query = '''
-            INSERT INTO manutencoes 
-            (identificacao, tipo, frota, descricao, fornecedor, valor, 
-             data_abertura, previsao_conclusao, data_conclusao, observacoes, finalizada)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        '''
-        
         try:
-            cursor = conn.cursor()
-            cursor.execute(query, (
-                dados['identificacao'],
-                dados['tipo'],
-                dados['frota'],
-                dados['descricao'],
-                dados.get('fornecedor', ''),
-                dados.get('valor', 0),
-                dados['data_abertura'],
-                dados.get('previsao_conclusao', ''),
-                dados.get('data_conclusao', ''),
-                dados.get('observacoes', ''),
-                dados.get('finalizada', False)
-            ))
-            conn.commit()
-            manutencao_id = cursor.lastrowid
-            conn.close()
-            
-            return jsonify({'success': True, 'id': manutencao_id})
+            manutencao_id = criar_manutencao(dados)
+            if manutencao_id:
+                return jsonify({'success': True, 'id': manutencao_id})
+            else:
+                return jsonify({'success': False, 'error': 'Erro ao criar manutenção'}), 400
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/manutencoes/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 def api_manutencao(id):
     """API para gerenciar uma manutenção específica"""
-    conn = sqlite3.connect('abastecimentos.db')
     
     if request.method == 'GET':
         # Buscar manutenção específica
         try:
-            query = "SELECT * FROM manutencoes WHERE id = ?"
-            df = pd.read_sql(query, conn, params=(id,))
-            conn.close()
-            
-            if not df.empty:
-                return jsonify(df.iloc[0].to_dict())
+            manutencao = obter_manutencao_por_id(id)
+            if manutencao:
+                return jsonify(manutencao)
             return jsonify({'error': 'Manutenção não encontrada'}), 404
         except Exception as e:
-            conn.close()
             return jsonify({'error': str(e)}), 500
     
     elif request.method == 'PUT':
         # Atualizar manutenção
         dados = request.get_json()
         
-        query = '''
-            UPDATE manutencoes SET
-                identificacao = ?, tipo = ?, frota = ?, descricao = ?, 
-                fornecedor = ?, valor = ?, data_abertura = ?, 
-                previsao_conclusao = ?, data_conclusao = ?, 
-                observacoes = ?, finalizada = ?
-            WHERE id = ?
-        '''
-        
         try:
-            cursor = conn.cursor()
-            cursor.execute(query, (
-                dados['identificacao'],
-                dados['tipo'],
-                dados['frota'],
-                dados['descricao'],
-                dados.get('fornecedor', ''),
-                dados.get('valor', 0),
-                dados['data_abertura'],
-                dados.get('previsao_conclusao', ''),
-                dados.get('data_conclusao', ''),
-                dados.get('observacoes', ''),
-                dados.get('finalizada', False),
-                id
-            ))
-            conn.commit()
-            conn.close()
-            
-            return jsonify({'success': True})
+            if atualizar_manutencao(id, dados):
+                return jsonify({'success': True})
+            else:
+                return jsonify({'success': False, 'error': 'Erro ao atualizar manutenção'}), 400
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
     
     elif request.method == 'DELETE':
         # Excluir manutenção
         try:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM manutencoes WHERE id = ?", (id,))
-            conn.commit()
-            conn.close()
-            
-            if cursor.rowcount > 0:
+            if excluir_manutencao(id):
                 return jsonify({'success': True})
             return jsonify({'success': False, 'error': 'Manutenção não encontrada'}), 404
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/checklists')
@@ -398,12 +308,7 @@ def checklists():
     """Página de gerenciamento de checklists"""
     try:
         # Buscar checklists
-        query = "SELECT * FROM checklists ORDER BY data DESC"
-        conn = sqlite3.connect('abastecimentos.db')
-        df = pd.read_sql(query, conn)
-        checklists = df.to_dict('records')
-        
-        conn.close()
+        checklists = obter_checklists()
         
         return render_template('checklists.html', 
                              active_page='checklists',
@@ -417,113 +322,63 @@ def checklists():
 @app.route('/api/checklists', methods=['GET', 'POST'])
 def api_checklists():
     """API para gerenciar checklists"""
-    conn = sqlite3.connect('abastecimentos.db')
     
     if request.method == 'GET':
         # Retornar lista de checklists
         try:
-            query = "SELECT * FROM checklists ORDER BY data DESC"
-            df = pd.read_sql(query, conn)
-            conn.close()
-            
+            checklists = obter_checklists()
             return jsonify({
-                'checklists': df.to_dict('records')
+                'checklists': checklists
             })
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 500
     
     elif request.method == 'POST':
         # Criar novo checklist
         dados = request.get_json()
         
-        query = '''
-            INSERT INTO checklists 
-            (identificacao, data, horimetro, nivel_oleo, observacoes, itens_checklist)
-            VALUES (?, ?, ?, ?, ?, ?)
-        '''
-        
         try:
-            cursor = conn.cursor()
-            cursor.execute(query, (
-                dados['identificacao'],
-                dados['data'],
-                dados.get('horimetro'),
-                dados.get('nivel_oleo', 'ADEQUADO'),
-                dados.get('observacoes', ''),
-                dados.get('itens_checklist', '')
-            ))
-            conn.commit()
-            checklist_id = cursor.lastrowid
-            conn.close()
-            
-            return jsonify({'success': True, 'id': checklist_id})
+            checklist_id = criar_checklist(dados)
+            if checklist_id:
+                return jsonify({'success': True, 'id': checklist_id})
+            else:
+                return jsonify({'success': False, 'error': 'Erro ao criar checklist'}), 400
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/checklists/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 def api_checklist(id):
     """API para gerenciar um checklist específico"""
-    conn = sqlite3.connect('abastecimentos.db')
     
     if request.method == 'GET':
         # Buscar checklist específico
         try:
-            query = "SELECT * FROM checklists WHERE id = ?"
-            df = pd.read_sql(query, conn, params=(id,))
-            conn.close()
-            
-            if not df.empty:
-                return jsonify(df.iloc[0].to_dict())
+            checklist = obter_checklist_por_id(id)
+            if checklist:
+                return jsonify(checklist)
             return jsonify({'error': 'Checklist não encontrado'}), 404
         except Exception as e:
-            conn.close()
             return jsonify({'error': str(e)}), 500
     
     elif request.method == 'PUT':
         # Atualizar checklist
         dados = request.get_json()
         
-        query = '''
-            UPDATE checklists SET
-                identificacao = ?, data = ?, horimetro = ?, 
-                nivel_oleo = ?, observacoes = ?, itens_checklist = ?
-            WHERE id = ?
-        '''
-        
         try:
-            cursor = conn.cursor()
-            cursor.execute(query, (
-                dados['identificacao'],
-                dados['data'],
-                dados.get('horimetro'),
-                dados.get('nivel_oleo', 'ADEQUADO'),
-                dados.get('observacoes', ''),
-                dados.get('itens_checklist', ''),
-                id
-            ))
-            conn.commit()
-            conn.close()
-            
-            return jsonify({'success': True})
+            if atualizar_checklist(id, dados):
+                return jsonify({'success': True})
+            else:
+                return jsonify({'success': False, 'error': 'Erro ao atualizar checklist'}), 400
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
     
     elif request.method == 'DELETE':
         # Excluir checklist
         try:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM checklists WHERE id = ?", (id,))
-            conn.commit()
-            conn.close()
-            
-            if cursor.rowcount > 0:
+            if excluir_checklist(id):
                 return jsonify({'success': True})
             return jsonify({'success': False, 'error': 'Checklist não encontrado'}), 404
         except Exception as e:
-            conn.close()
             return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/medias-veiculos')
