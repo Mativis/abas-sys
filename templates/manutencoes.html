@@ -409,6 +409,7 @@ function carregarManutencoes() {
     fetch('/api/manutencoes')
         .then(response => response.json())
         .then(data => {
+            console.log('Dados recebidos:', data); // Debug
             if (data.manutencoes && Array.isArray(data.manutencoes)) {
                 manutencoes = data.manutencoes;
                 
@@ -441,6 +442,7 @@ function carregarManutencoes() {
                     document.getElementById('proximas-liberacao').textContent = proximas.length;
                 }
             } else {
+                console.error('Estrutura de dados inválida:', data);
                 manutencoes = [];
             }
             aplicarFiltros();
@@ -560,8 +562,9 @@ function aplicarFiltros() {
 
 function atualizarTabela(dados) {
     const tbody = document.getElementById('corpoTabela');
+    console.log('Atualizando tabela com:', dados); // Debug
     
-    if (dados.length === 0) {
+    if (!dados || dados.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="10" class="text-center py-4">
@@ -575,25 +578,40 @@ function atualizarTabela(dados) {
 
     let html = '';
     dados.forEach(manutencao => {
-        const valorFormatado = 'R$ ' + (manutencao.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // Adicionar verificações para evitar erros
+        const valor = manutencao.valor || 0;
+        const valorFormatado = 'R$ ' + valor.toLocaleString('pt-BR', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        });
+        
         const tipoFormatado = manutencao.tipo === 'corretiva' ? 'Corretiva' : 'Preventiva';
+        
         const frotaFormatada = {
             'apoio': 'Apoio',
             'maquinas': 'Máquinas',
             'equipamento': 'Equipamento'
         }[manutencao.frota] || manutencao.frota;
         
-        const pagamentoFormatado = manutencao.forma_pagamento ? 
-            `${manutencao.forma_pagamento}${manutencao.parcelas && manutencao.parcelas > 1 ? ` (${manutencao.parcelas}x)` : ''}` : 
+        // Verificar se as propriedades existem antes de acessá-las
+        const formaPagamento = manutencao.forma_pagamento || '';
+        const parcelas = manutencao.parcelas || 0;
+        
+        const pagamentoFormatado = formaPagamento ? 
+            `${formaPagamento}${parcelas > 1 ? ` (${parcelas}x)` : ''}` : 
             '-';
+        
+        const descricao = manutencao.descricao || '';
+        const descricaoTruncada = descricao.length > 50 ? 
+            descricao.substring(0, 50) + '...' : descricao;
         
         html += `
             <tr id="row-${manutencao.id}">
                 <td>${manutencao.id}</td>
-                <td>${manutencao.identificacao}</td>
+                <td>${manutencao.identificacao || '-'}</td>
                 <td>${tipoFormatado}</td>
                 <td>${frotaFormatada}</td>
-                <td>${manutencao.descricao.substring(0, 50)}${manutencao.descricao.length > 50 ? '...' : ''}</td>
+                <td>${descricaoTruncada}</td>
                 <td>${manutencao.fornecedor || '-'}</td>
                 <td class="text-end">${valorFormatado}</td>
                 <td>${pagamentoFormatado}</td>

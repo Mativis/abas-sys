@@ -157,7 +157,7 @@ def criar_tabelas():
             ('GASOLINA', 5.890, datetime.now().strftime('%Y-%m-%d')),
             ('DIESEL S10', 4.950, datetime.now().strftime('%Y-%m-%d')),
             ('ETANOL', 4.390, datetime.now().strftime('%Y-%m-%d')),
-            ('DIESEL S500', 4.750, datetime.now().strftime('%Y-%m-%d')),
+            ('DESSEL S500', 4.750, datetime.now().strftime('%Y-%m-%d')),
             ('ARLA', 2.990, datetime.now().strftime('%Y-%m-%d'))
         ]
         
@@ -373,7 +373,7 @@ def calcular_medias_veiculos():
         print(f"Erro ao calcular km/litro: {e}")
         conn.rollback()
     
-    # Agora busca as médias por veículo
+    # Agora busca das médias por veículo
     query_medias = """
     SELECT 
         placa,
@@ -926,14 +926,38 @@ def excluir_troca_oleo(identificacao, tipo):
     finally:
         conn.close()
 
-# NOVAS FUNÇÕES PARA MANUTENÇÕES
+# NOVAS FUNÇÕES PARA MANUTENÇÕES - VERSÃO CORRIGIDA
 def obter_manutencoes():
-    """Obtém todas as manutenções"""
+    """Obtém todas as manutenções com tratamento adequado de campos NULL"""
     conn = sqlite3.connect('abastecimentos.db')
     
     try:
-        query = "SELECT * FROM manutencoes ORDER BY data_abertura DESC"
+        query = """
+        SELECT 
+            id,
+            identificacao,
+            tipo,
+            frota,
+            descricao,
+            COALESCE(fornecedor, '') as fornecedor,
+            COALESCE(valor, 0) as valor,
+            data_abertura,
+            COALESCE(previsao_conclusao, '') as previsao_conclusao,
+            COALESCE(data_conclusao, '') as data_conclusao,
+            COALESCE(observacoes, '') as observacoes,
+            finalizada,
+            COALESCE(prazo_liberacao, 0) as prazo_liberacao,
+            COALESCE(forma_pagamento, '') as forma_pagamento,
+            COALESCE(parcelas, 1) as parcelas,
+            data_registro
+        FROM manutencoes 
+        ORDER BY data_abertura DESC
+        """
         df = pd.read_sql(query, conn)
+        
+        # Converter booleanos corretamente
+        df['finalizada'] = df['finalizada'].astype(bool)
+        
         return df.to_dict('records')
     except Exception as e:
         print(f"Erro ao obter manutenções: {e}")
@@ -942,13 +966,36 @@ def obter_manutencoes():
         conn.close()
 
 def obter_manutencao_por_id(id):
-    """Obtém uma manutenção específica pelo ID"""
+    """Obtém uma manutenção específica pelo ID com tratamento de NULL"""
     conn = sqlite3.connect('abastecimentos.db')
     
     try:
-        query = "SELECT * FROM manutencoes WHERE id = ?"
+        query = """
+        SELECT 
+            id,
+            identificacao,
+            tipo,
+            frota,
+            descricao,
+            COALESCE(fornecedor, '') as fornecedor,
+            COALESCE(valor, 0) as valor,
+            data_abertura,
+            COALESCE(previsao_conclusao, '') as previsao_conclusao,
+            COALESCE(data_conclusao, '') as data_conclusao,
+            COALESCE(observacoes, '') as observacoes,
+            finalizada,
+            COALESCE(prazo_liberacao, 0) as prazo_liberacao,
+            COALESCE(forma_pagamento, '') as forma_pagamento,
+            COALESCE(parcelas, 1) as parcelas,
+            data_registro
+        FROM manutencoes 
+        WHERE id = ?
+        """
         df = pd.read_sql(query, conn, params=(id,))
+        
         if not df.empty:
+            # Converter booleanos corretamente
+            df['finalizada'] = df['finalizada'].astype(bool)
             return df.iloc[0].to_dict()
         return None
     except Exception as e:
@@ -958,7 +1005,7 @@ def obter_manutencao_por_id(id):
         conn.close()
 
 def criar_manutencao(dados):
-    """Cria uma nova manutenção"""
+    """Cria uma nova manutenção com tratamento de valores padrão"""
     conn = sqlite3.connect('abastecimentos.db')
     cursor = conn.cursor()
     
@@ -971,32 +1018,44 @@ def criar_manutencao(dados):
     """
     
     try:
+        # Tratar valores padrão
+        fornecedor = dados.get('fornecedor', '') or ''
+        valor = float(dados.get('valor', 0)) if dados.get('valor') not in [None, ''] else 0
+        previsao_conclusao = dados.get('previsao_conclusao', '') or ''
+        data_conclusao = dados.get('data_conclusao', '') or ''
+        observacoes = dados.get('observacoes', '') or ''
+        finalizada = 1 if dados.get('finalizada', False) else 0
+        prazo_liberacao = int(dados.get('prazo_liberacao', 0)) if dados.get('prazo_liberacao') not in [None, ''] else None
+        forma_pagamento = dados.get('forma_pagamento', '') or ''
+        parcelas = int(dados.get('parcelas', 1)) if dados.get('parcelas') not in [None, ''] else 1
+        
         cursor.execute(query, (
             dados['identificacao'],
             dados['tipo'],
             dados['frota'],
             dados['descricao'],
-            dados.get('fornecedor', ''),
-            dados.get('valor', 0),
+            fornecedor,
+            valor,
             dados['data_abertura'],
-            dados.get('previsao_conclusao', ''),
-            dados.get('data_conclusao', ''),
-            dados.get('observacoes', ''),
-            dados.get('finalizada', False),
-            dados.get('prazo_liberacao'),
-            dados.get('forma_pagamento', ''),
-            dados.get('parcelas', 1)
+            previsao_conclusao,
+            data_conclusao,
+            observacoes,
+            finalizada,
+            prazo_liberacao,
+            forma_pagamento,
+            parcelas
         ))
         conn.commit()
         return cursor.lastrowid
     except Exception as e:
         print(f"Erro ao criar manutenção: {e}")
+        conn.rollback()
         return False
     finally:
         conn.close()
 
 def atualizar_manutencao(id, dados):
-    """Atualiza uma manutenção existente"""
+    """Atualiza uma manutenção existente com tratamento de valores"""
     conn = sqlite3.connect('abastecimentos.db')
     cursor = conn.cursor()
     
@@ -1011,27 +1070,39 @@ def atualizar_manutencao(id, dados):
     """
     
     try:
+        # Tratar valores padrão
+        fornecedor = dados.get('fornecedor', '') or ''
+        valor = float(dados.get('valor', 0)) if dados.get('valor') not in [None, ''] else 0
+        previsao_conclusao = dados.get('previsao_conclusao', '') or ''
+        data_conclusao = dados.get('data_conclusao', '') or ''
+        observacoes = dados.get('observacoes', '') or ''
+        finalizada = 1 if dados.get('finalizada', False) else 0
+        prazo_liberacao = int(dados.get('prazo_liberacao', 0)) if dados.get('prazo_liberacao') not in [None, ''] else None
+        forma_pagamento = dados.get('forma_pagamento', '') or ''
+        parcelas = int(dados.get('parcelas', 1)) if dados.get('parcelas') not in [None, ''] else 1
+        
         cursor.execute(query, (
             dados['identificacao'],
             dados['tipo'],
             dados['frota'],
             dados['descricao'],
-            dados.get('fornecedor', ''),
-            dados.get('valor', 0),
+            fornecedor,
+            valor,
             dados['data_abertura'],
-            dados.get('previsao_conclusao', ''),
-            dados.get('data_conclusao', ''),
-            dados.get('observacoes', ''),
-            dados.get('finalizada', False),
-            dados.get('prazo_liberacao'),
-            dados.get('forma_pagamento', ''),
-            dados.get('parcelas', 1),
+            previsao_conclusao,
+            data_conclusao,
+            observacoes,
+            finalizada,
+            prazo_liberacao,
+            forma_pagamento,
+            parcelas,
             id
         ))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
         print(f"Erro ao atualizar manutenção: {e}")
+        conn.rollback()
         return False
     finally:
         conn.close()
@@ -1052,7 +1123,7 @@ def excluir_manutencao(id):
         conn.close()
 
 def obter_estatisticas_manutencoes():
-    """Obtém estatísticas das manutenções"""
+    """Obtém estatísticas das manutenções com tratamento de NULL"""
     conn = sqlite3.connect('abastecimentos.db')
     
     try:
@@ -1067,14 +1138,14 @@ def obter_estatisticas_manutencoes():
         cursor.execute("SELECT COUNT(*) as finalizadas FROM manutencoes WHERE finalizada = 1")
         finalizadas = cursor.fetchone()[0]
         
-        cursor.execute("SELECT SUM(valor) as valor_total FROM manutencoes")
-        valor_total = cursor.fetchone()[0] or 0
+        cursor.execute("SELECT COALESCE(SUM(valor), 0) as valor_total FROM manutencoes")
+        valor_total = cursor.fetchone()[0]
         
         return {
             'total': total,
             'abertas': abertas,
             'finalizadas': finalizadas,
-            'valor_total': valor_total
+            'valor_total': float(valor_total)
         }
     except Exception as e:
         print(f"Erro ao obter estatísticas de manutenções: {e}")
@@ -1082,7 +1153,24 @@ def obter_estatisticas_manutencoes():
             'total': 0,
             'abertas': 0,
             'finalizadas': 0,
-            'valor_total': 0
+            'valor_total': 0.0
         }
+    finally:
+        conn.close()
+
+def debug_manutencoes():
+    """Função de debug para verificar os dados das manutenções"""
+    conn = sqlite3.connect('abastecimentos.db')
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM manutencoes")
+        rows = cursor.fetchall()
+        print("DEBUG - Dados na tabela manutencoes:")
+        for row in rows:
+            print(row)
+        return rows
+    except Exception as e:
+        print(f"Erro no debug: {e}")
+        return []
     finally:
         conn.close()
