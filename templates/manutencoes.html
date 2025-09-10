@@ -476,6 +476,7 @@
                         <option value="data">Data de Abertura</option>
                         <option value="valor">Valor</option>
                         <option value="status">Status</option>
+                        <option value="prazo">Prazo Liberação</option>
                     </select>
                 </div>
                 <div class="mb-3 form-check">
@@ -485,6 +486,10 @@
                 <div class="mb-3 form-check">
                     <input type="checkbox" class="form-check-input" id="incluirEstatisticas" checked>
                     <label class="form-check-label" for="incluirEstatisticas">Incluir estatísticas</label>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="incluirAssinaturas" checked>
+                    <label class="form-check-label" for="incluirAssinaturas">Incluir espaço para assinaturas</label>
                 </div>
             </div>
             <div class="modal-footer">
@@ -496,6 +501,7 @@
 </div>
 
 <script>
+
 // Variáveis globais
 let manutencoes = [];
 let manutencoesAgrupadas = {};

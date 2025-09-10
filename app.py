@@ -75,9 +75,10 @@ def gerar_grafico(df, x_col, y_cols, title, tipo='bar', filename='grafico.png'):
 def index():
     # Calcular estatísticas para o dashboard
     try:
-        # Total de abastecimentos
         conn = sqlite3.connect('abastecimentos.db')
         cursor = conn.cursor()
+        
+        # Total de abastecimentos
         cursor.execute("SELECT COUNT(*) FROM abastecimentos")
         total_abastecimentos = cursor.fetchone()[0]
         
@@ -86,17 +87,21 @@ def index():
         total_veiculos = cursor.fetchone()[0]
         
         # Total de manutenções
-        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        cursor.execute("SELECT SUM(valor) FROM manutencoes")
         total_manutencoes = cursor.fetchone()[0]
         
         # Total de checklists
         cursor.execute("SELECT COUNT(*) FROM checklists")
         total_checklists = cursor.fetchone()[0]
         
-        # Gasto total
+        # Total de abastecimentos
         cursor.execute("SELECT SUM(custo_liquido) FROM abastecimentos")
         gasto_total = cursor.fetchone()[0] or 0
         
+        # Total de abastecimentos
+        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        manutencoescount = cursor.fetchone()[0] or 0
+
         conn.close()
         
         return render_template('index.html', 
@@ -105,6 +110,7 @@ def index():
                              total_veiculos=total_veiculos,
                              total_manutencoes=total_manutencoes,
                              total_checklists=total_checklists,
+                             manutencoescount=manutencoescount,
                              gasto_total=gasto_total)
     except Exception as e:
         print(f"Erro ao carregar dados do dashboard: {e}")
@@ -114,6 +120,7 @@ def index():
                              total_veiculos=0,
                              total_manutencoes=0,
                              total_checklists=0,
+                             manutencoescount=0,
                              gasto_total=0)
 
 @app.route('/api/dashboard')
@@ -132,17 +139,21 @@ def api_dashboard():
         total_veiculos = cursor.fetchone()[0]
         
         # Total de manutenções
-        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        cursor.execute("SELECT SUM(valor) FROM manutencoes")
         total_manutencoes = cursor.fetchone()[0]
         
         # Total de checklists
         cursor.execute("SELECT COUNT(*) FROM checklists")
         total_checklists = cursor.fetchone()[0]
         
-        # Gasto total
+        # Total de abastecimentos
         cursor.execute("SELECT SUM(custo_liquido) FROM abastecimentos")
         gasto_total = cursor.fetchone()[0] or 0
         
+        # Total de abastecimentos
+        cursor.execute("SELECT COUNT(*) FROM manutencoes")
+        manutencoescount = cursor.fetchone()[0] or 0
+
         conn.close()
         
         return jsonify({
@@ -151,7 +162,8 @@ def api_dashboard():
             'total_veiculos': total_veiculos,
             'total_manutencoes': total_manutencoes,
             'total_checklists': total_checklists,
-            'gasto_total': gasto_total
+            'gasto_total': gasto_total,
+            'manutencoescount': manutencoescount
         })
     except Exception as e:
         return jsonify({
