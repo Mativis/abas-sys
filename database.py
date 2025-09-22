@@ -30,6 +30,18 @@ def criar_tabelas():
     )
     ''')
     
+     # Tabela de pedágios
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pedagios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT NOT NULL,
+        placa TEXT NOT NULL,
+        valor REAL NOT NULL,
+        observacoes TEXT,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
     # Tabela de preços de combustíveis
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS precos_combustivel (
@@ -307,6 +319,91 @@ def obter_relatorio(data_inicio, data_fim, placa=None, centro_custo=None, combus
     finally:
         conn.close()
     return df
+
+def criar_pedagio(dados):
+    """Cria um novo registro de pedágio."""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    query = "INSERT INTO pedagios (data, placa, valor, observacoes) VALUES (?, ?, ?, ?)"
+    try:
+        cursor.execute(query, (
+            dados['data'],
+            dados['placa'],
+            round(float(dados['valor']), 2),
+            dados.get('observacoes', '')
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        print(f"Erro ao criar pedágio: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def obter_pedagios():
+    """Obtém todos os registros de pedágio."""
+    conn = sqlite3.connect('abastecimentos.db')
+    query = "SELECT * FROM pedagios ORDER BY data DESC, placa ASC"
+    try:
+        df = pd.read_sql(query, conn)
+        return df.to_dict('records')
+    except Exception as e:
+        print(f"Erro ao obter pedágios: {e}")
+        return []
+    finally:
+        conn.close()
+        
+def obter_pedagio_por_id(id):
+    """Obtém um registro de pedágio específico pelo ID."""
+    conn = sqlite3.connect('abastecimentos.db')
+    query = "SELECT * FROM pedagios WHERE id = ?"
+    try:
+        df = pd.read_sql(query, conn, params=(id,))
+        if not df.empty:
+            return df.iloc[0].to_dict()
+        return None
+    except Exception as e:
+        print(f"Erro ao obter pedágio por ID: {e}")
+        return None
+    finally:
+        conn.close()
+
+def atualizar_pedagio(id, dados):
+    """Atualiza um registro de pedágio existente."""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    query = "UPDATE pedagios SET data = ?, placa = ?, valor = ?, observacoes = ? WHERE id = ?"
+    try:
+        cursor.execute(query, (
+            dados['data'],
+            dados['placa'],
+            round(float(dados['valor']), 2),
+            dados.get('observacoes', ''),
+            id
+        ))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao atualizar pedágio: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def excluir_pedagio(id):
+    """Exclui um registro de pedágio pelo ID."""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM pedagios WHERE id = ?", (id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Erro ao excluir pedágio: {e}")
+        return False
+    finally:
+        conn.close()
 
 def calcular_medias_veiculos():
     """Calcula médias de consumo por veículo"""

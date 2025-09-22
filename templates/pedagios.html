@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-cash-stack"></i> Relatórios de Pedágio
+        </div>
+        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novoPedagioModal">
+            <i class="bi bi-plus-circle"></i> Novo Pedágio
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover" id="tabelaPedagios">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Data</th>
+                        <th>Placa</th>
+                        <th class="text-end">Valor (R$)</th>
+                        <th>Observações</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="corpoTabela">
+                    {% for item in pedagios %}
+                    <tr id="row-{{ item.id }}">
+                        <td>{{ item.data }}</td>
+                        <td><span class="badge bg-secondary">{{ item.placa }}</span></td>
+                        <td class="text-end fw-bold">R$ {{ "%.2f"|format(item.valor) }}</td>
+                        <td>{{ item.observacoes if item.observacoes else '-' }}</td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editarPedagio({{ item.id }})"
+                                        data-bs-toggle="tooltip" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="excluirPedagio({{ item.id }})"
+                                        data-bs-toggle="tooltip" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <button class="btn btn-outline-info" onclick="detalhesPedagio({{ item.id }})"
+                                        data-bs-toggle="tooltip" title="Detalhes">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4">
+                            <i class="bi bi-inbox display-1 text-muted"></i>
+                            <p class="text-muted mt-3">Nenhum pedágio encontrado.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6>Total de Registros</h6>
+                        <h3 class="text-primary">{{ pedagios|length }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6>Valor Total</h6>
+                        <h3 class="text-danger">R$ {{ "%.2f"|format(pedagios|sum(attribute='valor')) }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="novoPedagioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Registro de Pedágio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNovoPedagio">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Data *</label>
+                            <input type="date" class="form-control" name="data" required 
+                                   value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Placa *</label>
+                            <select class="form-select" name="placa" required>
+                                <option value="">Selecione a placa...</option>
+                                {% for placa in placas_disponiveis %}
+                                    <option value="{{ placa }}">{{ placa }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Valor (R$) *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" 
+                                   name="valor" required placeholder="Ex: 5.50">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" name="observacoes" rows="2" 
+                                      placeholder="Informações adicionais sobre o pedágio..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Pedágio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEdicao">
+                <input type="hidden" id="editar_id">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Data *</label>
+                            <input type="date" class="form-control" id="editar_data" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Placa *</label>
+                            <select class="form-select" id="editar_placa" required>
+                                <option value="">Selecione a placa...</option>
+                                {% for placa in placas_disponiveis %}
+                                    <option value="{{ placa }}">{{ placa }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Valor (R$) *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" 
+                                   id="editar_valor" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" id="editar_observacoes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarEdicao()">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detalhesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes do Pedágio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detalhesConteudo">
+                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let pedagios = {{ pedagios|tojson }};
+const placasDisponiveis = {{ placas_disponiveis|tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Formulário de novo registro
+    document.getElementById('formNovoPedagio').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const dados = {
+            data: formData.get('data'),
+            placa: formData.get('placa'),
+            valor: parseFloat(formData.get('valor')),
+            observacoes: formData.get('observacoes')
+        };
+
+        fetch('/api/pedagios', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(dados)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('novoPedagioModal')).hide();
+                showAlert('Registro criado com sucesso!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Erro ao criar registro: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro ao criar registro', 'danger');
+        });
+    });
+});
+
+function editarPedagio(id) {
+    fetch(`/api/pedagios/${id}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.id) {
+            document.getElementById('editar_id').value = data.id;
+            document.getElementById('editar_data').value = data.data;
+            document.getElementById('editar_placa').value = data.placa;
+            document.getElementById('editar_valor').value = data.valor;
+            document.getElementById('editar_observacoes').value = data.observacoes || '';
+            
+            new bootstrap.Modal(document.getElementById('editarModal')).show();
+        } else {
+            showAlert('Erro ao carregar dados: ' + data.error, 'danger');
+        }
+    });
+}
+
+function salvarEdicao() {
+    const id = document.getElementById('editar_id').value;
+    const dados = {
+        data: document.getElementById('editar_data').value,
+        placa: document.getElementById('editar_placa').value,
+        valor: parseFloat(document.getElementById('editar_valor').value),
+        observacoes: document.getElementById('editar_observacoes').value
+    };
+
+    fetch(`/api/pedagios/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editarModal')).hide();
+            showAlert('Registro atualizado com sucesso!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert('Erro ao atualizar registro: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Erro ao atualizar registro', 'danger');
+    });
+}
+
+function excluirPedagio(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        fetch(`/api/pedagios/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Registro excluído com sucesso!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Erro ao excluir registro: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro ao excluir registro', 'danger');
+        });
+    }
+}
+
+function detalhesPedagio(id) {
+    fetch(`/api/pedagios/${id}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.id) {
+            const detalhesHtml = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>ID:</strong> ${data.id}</p>
+                        <p><strong>Data:</strong> ${data.data}</p>
+                        <p><strong>Placa:</strong> ${data.placa}</p>
+                        <p><strong>Valor:</strong> R$ ${parseFloat(data.valor).toFixed(2)}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Data de Registro:</strong> ${data.data_registro.split(' ')[0]}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6>Observações:</h6>
+                                <p>${data.observacoes || '-'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('detalhesConteudo').innerHTML = detalhesHtml;
+            new bootstrap.Modal(document.getElementById('detalhesModal')).show();
+        } else {
+            showAlert('Erro ao carregar detalhes: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Erro ao carregar detalhes do registro', 'danger');
+    });
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.navbar').nextElementSibling);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

@@ -34,13 +34,18 @@ from database import (
     excluir_troca_oleo,
     obter_troca_oleo_por_identificacao_tipo,
     atualizar_troca_oleo,
-    # NOVAS FUNÇÕES PARA MANUTENÇÕES
     obter_manutencoes,
     obter_manutencao_por_id,
     criar_manutencao,
     atualizar_manutencao,
     excluir_manutencao,
-    obter_estatisticas_manutencoes
+    obter_estatisticas_manutencoes,
+    obter_placas_veiculos,
+    criar_pedagio,
+    obter_pedagios,
+    obter_pedagio_por_id,
+    atualizar_pedagio,
+    excluir_pedagio
 )
 
 app = Flask(__name__)
@@ -614,6 +619,67 @@ def gerenciar_registro(id):
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
 
+@app.route('/pedagios')
+def pedagios():
+    """Página de gerenciamento de pedágios"""
+    try:
+        pedagios = obter_pedagios()
+        placas_disponiveis = obter_placas_veiculos()
+        return render_template('pedagios.html', 
+                               active_page='pedagios',
+                               pedagios=pedagios,
+                               placas_disponiveis=placas_disponiveis)
+    except Exception as e:
+        flash(f'Erro ao carregar pedágios: {str(e)}', 'danger')
+        return render_template('pedagios.html', 
+                               active_page='pedagios',
+                               pedagios=[],
+                               placas_disponiveis=[])
+
+@app.route('/api/pedagios', methods=['POST'])
+def api_criar_pedagio():
+    """API para criar um novo registro de pedágio"""
+    try:
+        dados = request.get_json()
+        if not all([dados.get('data'), dados.get('placa'), dados.get('valor')]):
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+        
+        pedagio_id = criar_pedagio(dados)
+        if pedagio_id:
+            return jsonify({'success': True, 'id': pedagio_id})
+        return jsonify({'success': False, 'error': 'Erro ao criar registro de pedágio'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/pedagios/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+def api_gerenciar_pedagio(id):
+    """API para gerenciar um registro de pedágio específico"""
+    if request.method == 'GET':
+        try:
+            pedagio = obter_pedagio_por_id(id)
+            if pedagio:
+                return jsonify(pedagio)
+            return jsonify({'error': 'Registro de pedágio não encontrado'}), 404
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    elif request.method == 'PUT':
+        try:
+            dados = request.get_json()
+            if atualizar_pedagio(id, dados):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Nenhum registro atualizado'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+            
+    elif request.method == 'DELETE':
+        try:
+            if excluir_pedagio(id):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Nenhum registro excluído'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+
 @app.route('/static/<path:filename>')
 def static_files(filename):
     return send_from_directory(app.config['STATIC_FOLDER'], filename)
@@ -624,4 +690,4 @@ def inject_now():
 
 if __name__ == '__main__':
     criar_tabelas()
-    app.run(debug=True, host='0.0.0.0', port='5000')
+    app.run(debug=True, host='0.0.0.0', port='5005')
