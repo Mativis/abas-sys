@@ -42,7 +42,7 @@ from database import (
     obter_estatisticas_manutencoes,
     obter_placas_veiculos,
     criar_pedagio,
-    obter_pedagios,
+    obter_pedagios_com_filtros,
     obter_pedagio_por_id,
     atualizar_pedagio,
     excluir_pedagio
@@ -619,22 +619,55 @@ def gerenciar_registro(id):
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/pedagios')
+@app.route('/pedagios', methods=['GET', 'POST'])
 def pedagios():
-    """Página de gerenciamento de pedágios"""
-    try:
-        pedagios = obter_pedagios()
-        placas_disponiveis = obter_placas_veiculos()
-        return render_template('pedagios.html', 
-                               active_page='pedagios',
-                               pedagios=pedagios,
-                               placas_disponiveis=placas_disponiveis)
-    except Exception as e:
-        flash(f'Erro ao carregar pedágios: {str(e)}', 'danger')
-        return render_template('pedagios.html', 
-                               active_page='pedagios',
-                               pedagios=[],
-                               placas_disponiveis=[])
+    """Página de gerenciamento e relatório de pedágios com filtros."""
+    placas_disponiveis = obter_placas_veiculos()
+    
+    if request.method == 'POST':
+        filtros = {
+            'data_inicio': request.form.get('data_inicio', '2023-01-01'),
+            'data_fim': request.form.get('data_fim', datetime.now().strftime('%Y-%m-%d')),
+            'placa': request.form.get('placa', '').strip() or None
+        }
+        
+        try:
+            pedagios = obter_pedagios_com_filtros(**filtros)
+            
+            if request.form.get('imprimir'):
+                return render_template(
+                    'relatorio_pedagios_impressao.html',
+                    pedagios=pedagios,
+                    filtros=filtros,
+                    data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M')
+                )
+            
+            return render_template('pedagios.html', 
+                                   active_page='pedagios',
+                                   pedagios=pedagios,
+                                   filtros=filtros,
+                                   placas_disponiveis=placas_disponiveis)
+        except Exception as e:
+            flash(f'Erro ao gerar relatório de pedágios: {str(e)}', 'danger')
+            return render_template('pedagios.html', 
+                                   active_page='pedagios',
+                                   pedagios=[],
+                                   placas_disponiveis=placas_disponiveis)
+
+    # Requisição GET inicial
+    filtros = {
+        'data_inicio': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
+        'data_fim': datetime.now().strftime('%Y-%m-%d'),
+        'placa': None
+    }
+    pedagios = obter_pedagios_com_filtros(**filtros)
+    
+    return render_template('pedagios.html', 
+                           active_page='pedagios',
+                           pedagios=pedagios,
+                           filtros=filtros,
+                           placas_disponiveis=placas_disponiveis)
+
 
 @app.route('/api/pedagios', methods=['POST'])
 def api_criar_pedagio():
@@ -679,6 +712,7 @@ def api_gerenciar_pedagio(id):
             return jsonify({'success': False, 'error': 'Nenhum registro excluído'}), 404
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
+
 
 @app.route('/static/<path:filename>')
 def static_files(filename):

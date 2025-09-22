@@ -11,6 +11,38 @@
         </button>
     </div>
     <div class="card-body">
+        <form method="POST" action="/pedagios" class="row g-3 mb-4">
+            <div class="col-md-3">
+                <label class="form-label">Data Início</label>
+                <input type="date" class="form-control" name="data_inicio" 
+                       value="{{ filtros.data_inicio if filtros else (now - timedelta(days=30)).strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data Fim</label>
+                <input type="date" class="form-control" name="data_fim" 
+                       value="{{ filtros.data_fim if filtros else now.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Placa</label>
+                <select class="form-select" name="placa">
+                    <option value="">Todas</option>
+                    {% for placa in placas_disponiveis %}
+                        <option value="{{ placa }}" {% if filtros and filtros.placa == placa %}selected{% endif %}>
+                            {{ placa }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Filtrar
+                </button>
+                <button type="submit" name="imprimir" value="1" class="btn btn-outline-primary">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+            </div>
+        </form>
+
         <div class="table-responsive">
             <table class="table table-striped table-hover" id="tabelaPedagios">
                 <thead class="table-dark">
@@ -55,26 +87,16 @@
                     </tr>
                     {% endfor %}
                 </tbody>
+                {% if pedagios %}
+                <tfoot class="table-group-divider">
+                    <tr class="table-primary fw-bold">
+                        <td colspan="2">Total</td>
+                        <td class="text-end">R$ {{ "%.2f"|format(pedagios|sum(attribute='valor')) }}</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
             </table>
-        </div>
-        
-        <div class="row mt-3">
-            <div class="col-md-3">
-                <div class="card bg-light">
-                    <div class="card-body text-center">
-                        <h6>Total de Registros</h6>
-                        <h3 class="text-primary">{{ pedagios|length }}</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-light">
-                    <div class="card-body text-center">
-                        <h6>Valor Total</h6>
-                        <h3 class="text-danger">R$ {{ "%.2f"|format(pedagios|sum(attribute='valor')) }}</h3>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -186,7 +208,6 @@
 
 <script>
 // Variáveis globais
-let pedagios = {{ pedagios|tojson }};
 const placasDisponiveis = {{ placas_disponiveis|tojson }};
 
 document.addEventListener('DOMContentLoaded', function() {

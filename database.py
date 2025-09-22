@@ -341,19 +341,49 @@ def criar_pedagio(dados):
     finally:
         conn.close()
 
-def obter_pedagios():
-    """Obtém todos os registros de pedágio."""
+def obter_pedagios_com_filtros(data_inicio, data_fim, placa=None):
+    """Obtém registros de pedágio com filtros de data e placa."""
     conn = sqlite3.connect('abastecimentos.db')
-    query = "SELECT * FROM pedagios ORDER BY data DESC, placa ASC"
+    
+    query = "SELECT * FROM pedagios WHERE data BETWEEN ? AND ?"
+    params = [data_inicio, data_fim]
+    
+    if placa:
+        query += " AND placa = ?"
+        params.append(placa.upper())
+    
+    query += " ORDER BY data DESC, placa ASC"
+    
     try:
-        df = pd.read_sql(query, conn)
+        df = pd.read_sql(query, conn, params=params)
         return df.to_dict('records')
     except Exception as e:
-        print(f"Erro ao obter pedágios: {e}")
+        print(f"Erro ao obter pedágios com filtros: {e}")
         return []
     finally:
         conn.close()
-        
+
+def criar_pedagio(dados):
+    """Cria um novo registro de pedágio."""
+    conn = sqlite3.connect('abastecimentos.db')
+    cursor = conn.cursor()
+    query = "INSERT INTO pedagios (data, placa, valor, observacoes) VALUES (?, ?, ?, ?)"
+    try:
+        cursor.execute(query, (
+            dados['data'],
+            dados['placa'],
+            round(float(dados['valor']), 2),
+            dados.get('observacoes', '')
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        print(f"Erro ao criar pedágio: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+    
 def obter_pedagio_por_id(id):
     """Obtém um registro de pedágio específico pelo ID."""
     conn = sqlite3.connect('abastecimentos.db')
@@ -402,6 +432,21 @@ def excluir_pedagio(id):
     except Exception as e:
         print(f"Erro ao excluir pedágio: {e}")
         return False
+    finally:
+        conn.close()
+
+def obter_placas_veiculos():
+    """Obtém todas as placas de veículos cadastradas"""
+    conn = sqlite3.connect('abastecimentos.db')
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT placa FROM abastecimentos WHERE placa IS NOT NULL ORDER BY placa")
+        placas = [row[0] for row in cursor.fetchall()]
+        return placas
+    except Exception as e:
+        print(f"Erro ao obter placas: {e}")
+        return []
     finally:
         conn.close()
 
