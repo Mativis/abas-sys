@@ -267,16 +267,11 @@ let filtrosAtivos = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    // A página já carrega os dados com base nos filtros do backend
     aplicarFiltrosNaPagina();
 });
 
 function aplicarFiltrosNaPagina() {
-    // Aplica o filtro de placa e os outros filtros, se existirem na URL
-    const params = new URLSearchParams(window.location.search);
-    if(params.get('placa')) {
-        document.getElementById('filtroPlaca').value = params.get('placa');
-    }
-    
     let dadosFiltrados = [...dadosMedias];
     
     // Aplicar filtro de placa
@@ -364,7 +359,6 @@ function atualizarTabela(dados) {
 }
 
 function atualizarGraficos(dados) {
-    // Dados para gráficos (apenas veículos com dados válidos)
     const dadosValidos = dados.filter(v => v.media_kml && v.total_gasto);
     
     if (dadosValidos.length === 0) {
