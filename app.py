@@ -398,26 +398,65 @@ def api_checklist(id):
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/medias-veiculos')
+@app.route('/medias-veiculos', methods=['GET', 'POST'])
 def medias_veiculos():
+    data_inicio = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    data_fim = datetime.now().strftime('%Y-%m-%d')
+    
+    if request.method == 'POST':
+        data_inicio = request.form.get('data_inicio', data_inicio)
+        data_fim = request.form.get('data_fim', data_fim)
+        
     try:
-        dados = calcular_medias_veiculos()
+        dados = calcular_medias_veiculos(data_inicio, data_fim)
+        filtros = {'data_inicio': data_inicio, 'data_fim': data_fim}
+        
+        # Gerar gráfico estático
         df = pd.DataFrame(dados)
         if not df.empty:
-            gerar_grafico(df, 'placa', ['media_kml'], 'Média de KM/L por Veículo', 'bar', 'grafico_kml.png')
-        return render_template('medias_veiculos.html', dados=dados, active_page='medias')
+            gerar_grafico(df, 'placa', ['media_kml'], f'Média de KM/L por Veículo ({data_inicio} a {data_fim})', 'bar', 'grafico_kml.png')
+            
+        return render_template('medias_veiculos.html', 
+                               dados=dados, 
+                               filtros=filtros,
+                               active_page='medias')
     except Exception as e:
         flash(f'Erro ao calcular médias: {str(e)}', 'danger')
-        return render_template('medias_veiculos.html', dados=[], active_page='medias')
+        return render_template('medias_veiculos.html', 
+                               dados=[], 
+                               filtros={'data_inicio': data_inicio, 'data_fim': data_fim},
+                               active_page='medias')
 
-@app.route('/medias-veiculos-dados')
-def medias_veiculos_dados():
+@app.route('/api/medias-veiculos-dados')
+def api_medias_veiculos_dados():
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
     try:
-        dados = calcular_medias_veiculos()
+        dados = calcular_medias_veiculos(data_inicio, data_fim)
         return jsonify(dados)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
+        
+@app.route('/relatorio-medias-veiculos/imprimir', methods=['POST'])
+def relatorio_medias_veiculos_imprimir():
+    data_inicio = request.form.get('data_inicio')
+    data_fim = request.form.get('data_fim')
+    
+    try:
+        dados = calcular_medias_veiculos(data_inicio, data_fim)
+        filtros = {'data_inicio': data_inicio, 'data_fim': data_fim}
+        
+        return render_template(
+            'relatorio_medias_veiculos_impressao.html',
+            dados=dados,
+            filtros=filtros,
+            data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M')
+        )
+    except Exception as e:
+        flash(f'Erro ao gerar relatório para impressão: {str(e)}', 'danger')
+        return redirect(url_for('medias_veiculos'))
+        
 @app.route('/metricas-uso', methods=['GET', 'POST'])
 def metricas_uso():
     """Página de métricas de uso e controle de troca de óleo"""

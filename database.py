@@ -450,13 +450,22 @@ def obter_placas_veiculos():
     finally:
         conn.close()
 
-def calcular_medias_veiculos():
-    """Calcula médias de consumo por veículo"""
+def calcular_medias_veiculos(data_inicio=None, data_fim=None):
+    """Calcula médias de consumo por veículo com filtros de data."""
     conn = sqlite3.connect('abastecimentos.db')
     
+    # Se não houver datas, define um período padrão (ex: último ano)
+    if not data_inicio:
+        data_inicio = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+    if not data_fim:
+        data_fim = datetime.now().strftime('%Y-%m-%d')
+    
+    # Adiciona a cláusula WHERE para filtrar por data
+    filtro_data = "WHERE data BETWEEN ? AND ?"
+    params = [data_inicio, data_fim]
+    
     # Primeiro precisamos calcular o km_litro para cada abastecimento
-    # onde temos odômetro atual e anterior
-    query_calculo_km = """
+    query_calculo_km = f"""
     WITH abastecimentos_ordenados AS (
         SELECT 
             id,
@@ -466,7 +475,7 @@ def calcular_medias_veiculos():
             litros,
             LAG(odometro) OVER (PARTITION BY placa ORDER BY data) as odometro_anterior
         FROM abastecimentos
-        WHERE odometro IS NOT NULL
+        {filtro_data} AND odometro IS NOT NULL
     ),
     abastecimentos_com_km AS (
         SELECT 
@@ -508,15 +517,14 @@ def calcular_medias_veiculos():
     
     cursor = conn.cursor()
     try:
-        # Primeiro atualiza os cálculos de km/litro
-        cursor.execute(query_calculo_km)
+        cursor.execute(query_calculo_km, params)
         conn.commit()
     except Exception as e:
         print(f"Erro ao calcular km/litro: {e}")
         conn.rollback()
     
     # Agora busca das médias por veículo
-    query_medias = """
+    query_medias = f"""
     SELECT 
         placa,
         COUNT(*) as total_abastecimentos,
@@ -526,13 +534,13 @@ def calcular_medias_veiculos():
         MAX(odometro) as km_atual,
         SUM(litros) as total_litros
     FROM abastecimentos
-    WHERE km_litro IS NOT NULL
+    {filtro_data} AND km_litro IS NOT NULL
     GROUP BY placa
     ORDER BY media_kml DESC
     """
     
     try:
-        df = pd.read_sql(query_medias, conn)
+        df = pd.read_sql(query_medias, conn, params)
         return df.to_dict('records')
     except Exception as e:
         conn.close()
