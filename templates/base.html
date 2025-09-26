@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Abastecimentos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #94a3b8;
+            --success: #22c55e;
+            --warning: #f97316;
+            --danger: #ef4444;
+            --light: #f1f5f9;
+            --dark: #0f172a;
+            --border: #cbd5e1;
+            --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            --glass: rgba(255, 255, 255, 0.95);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: #475569;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 0;
+        }
+
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: var(--primary) !important;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-link {
+            color: #64748b !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem !important;
+            margin: 0 0.2rem;
+            border-radius: 10px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--primary) !important;
+            background: rgba(59, 130, 246, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            color: var(--primary) !important;
+            background: rgba(59, 130, 246, 0.12);
+            font-weight: 600;
+        }
+
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        .nav-group-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            padding: 0.5rem 1rem;
+            margin-top: 1rem;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-group {
+            border-left: 3px solid var(--primary);
+            padding-left: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .dropdown-menu {
+            border-radius: 12px;
+            box-shadow: var(--hover-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+        }
+
+        .dropdown-item {
+            border-radius: 8px;
+            margin: 0.2rem 0.5rem;
+            width: auto;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .dropdown-divider {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .card:hover {
+            box-shadow: var(--hover-shadow);
+            transform: translateY(-4px) scale(1.01);
+        }
+
+        .card-header {
+            background: transparent;
+            color: var(--dark);
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 1.25rem 1.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .card-body {
+            padding: 1.75rem;
+        }
+
+        .btn {
+            border-radius: 12px;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+        }
+
+        .table {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+        }
+
+        .table th {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            font-weight: 600;
+            border: none;
+            padding: 1.25rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .table td {
+            padding: 1.25rem;
+            border-color: rgba(255, 255, 255, 0.3);
+            vertical-align: middle;
+            font-weight: 500;
+        }
+
+        .table tr:hover td {
+            background: rgba(59, 130, 246, 0.04) !important;
+        }
+
+        .alert {
+            border: none;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .form-control, .form-select {
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 0.875rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+            background: white;
+        }
+
+        .badge {
+            font-weight: 600;
+            padding: 0.5rem 0.875rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+        }
+
+        .input-group-text {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+        }
+
+        .container {
+            max-width: 1400px;
+            padding: 0 1.5rem;
+        }
+
+        /* Efeitos glassmorphism */
+        .glass {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .card-body {
+                padding: 1.25rem;
+            }
+            
+            .table th, .table td {
+                padding: 1rem;
+            }
+            
+            .navbar-nav {
+                padding: 1rem 0;
+            }
+            
+            .nav-link {
+                margin: 0.5rem 0;
+                text-align: center;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+
+            .nav-group-title {
+                text-align: center;
+                margin-top: 1.5rem;
+            }
+
+            .nav-group {
+                border-left: none;
+                border-top: 3px solid var(--primary);
+                padding-left: 0;
+                padding-top: 0.5rem;
+            }
+        }
+
+        /* Animações */
+        .fade-in {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-in {
+            animation: slideInLeft 0.5s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Loaders */
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-width: 2px;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 10px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Efeito de profundidade */
+        .depth-1 {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .depth-2 {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .depth-3 {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Gradientes sutis */
+        .gradient-bg {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
+        }
+    </style>
+</head>
+<body class="gradient-bg">
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-droplet me-2"></i>Gerenciamento de Frotas - Eufrates
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <!-- Início -->
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if active_page == 'index' }}" href="/">
+                            <i class="bi bi-house me-1"></i> Início
+                        </a>
+                    </li>
+                    <li class="nav-item">
+            <a class="nav-link {{ 'active' if active_page == 'pedagios' }}" href="/pedagios">
+                <i class="bi bi-cash-stack me-1"></i> Pedágios
+            </a>
+                    </li>   
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://briaunaccustomed-uneuphemistically.ngrok-free.app/" class="fas fa-external-link-alt fa-xs">
+                            <i class="bi bi-clipboard me-1"></i> Mesocheck
+                        </a>
+                    </li>
+
+                    <!-- Abastecimento -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ 'active' if active_group == 'abastecimento' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-fuel-pump me-1"></i> Abastecimento
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li class="nav-group-title">Abastecimento</li>
+                            <li class="nav-group">
+                                <a class="dropdown-item {{ 'active' if active_page == 'relatorios' }}" href="/relatorios">
+                                    <i class="bi bi-bar-chart me-2"></i> Relatório
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'medias' }}" href="/medias-veiculos">
+                                    <i class="bi bi-speedometer2 me-2"></i> Média
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'combustiveis' }}" href="/reajuste-combustiveis">
+                                    <i class="bi bi-droplet me-2"></i> Combustíveis
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Manutenção -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ 'active' if active_group == 'manutencao' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-tools me-1"></i> Manutenção
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li class="nav-group-title">Manutenção</li>
+                            <li class="nav-group">
+                                <a class="dropdown-item {{ 'active' if active_page == 'manutencoes' }}" href="/manutencoes">
+                                    <i class="bi bi-wrench me-2"></i> Manutenções
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'metricas' }}" href="/metricas-uso">
+                                    <i class="bi bi-speedometer me-2"></i> Métricas
+                                </a>
+                                <a class="dropdown-item {{ 'active' if active_page == 'checklists' }}" href="/checklists">
+                                    <i class="bi bi-clipboard-check me-2"></i> Checklist
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show fade-in depth-2">
+                        <i class="bi bi-{{ 'check-circle-fill' if category == 'success' else 'exclamation-triangle-fill' }} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Sistema de preservação de filtros
+        const FilterManager = {
+            saveFilters: function(page, filters) {
+                const state = {
+                    timestamp: new Date().getTime(),
+                    filters: filters
+                };
+                localStorage.setItem(`filters_${page}`, JSON.stringify(state));
+            },
+            
+            loadFilters: function(page) {
+                const saved = localStorage.getItem(`filters_${page}`);
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    if (new Date().getTime() - state.timestamp < 300000) {
+                        return state.filters;
+                    }
+                }
+                return null;
+            },
+            
+            applySavedFilters: function(page, formId) {
+                const filters = this.loadFilters(page);
+                if (filters && formId) {
+                    const form = document.getElementById(formId);
+                    if (form) {
+                        Object.keys(filters).forEach(key => {
+                            const element = form.querySelector(`[name="${key}"]`);
+                            if (element) {
+                                if (element.type === 'checkbox' || element.type === 'radio') {
+                                    element.checked = filters[key];
+                                } else {
+                                    element.value = filters[key];
+                                }
+                            }
+                        });
+                    }
+                }
+                return filters;
+            },
+            
+            clearFilters: function(page) {
+                localStorage.removeItem(`filters_${page}`);
+            }
+        };
+
+        function getFormData(formId) {
+            const form = document.getElementById(formId);
+            if (!form) return {};
+            
+            const formData = new FormData(form);
+            const data = {};
+            
+            for (const [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            form.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(input => {
+                if (input.checked) {
+                    data[input.name] = input.value;
+                }
+            });
+            
+            return data;
+        }
+
+        function reloadWithFilters(page, formId) {
+            const filters = getFormData(formId);
+            FilterManager.saveFilters(page, filters);
+            return true;
+        }
+
+        function limparFiltros() {
+            const currentPage = '{{ active_page }}';
+            FilterManager.clearFilters(currentPage);
+            window.location.href = `/limpar-filtros/${currentPage}`;
+        }
+
+        function recarregarComFiltros() {
+            const currentPage = '{{ active_page }}';
+            const formIds = {
+                'relatorios': 'filtroForm',
+                'manutencoes': 'filtroManutencoesForm', 
+                'checklists': 'filtroChecklistsForm',
+                'metricas': 'filtroMetricasForm'
+            };
+            
+            if (formIds[currentPage]) {
+                const formData = getFormData(formIds[currentPage]);
+                FilterManager.saveFilters(currentPage, formData);
+            }
+            
+            setTimeout(() => {
+                location.reload();
+            }, 100);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPage = '{{ active_page }}';
+            const formIds = {
+                'relatorios': 'filtroForm',
+                'manutencoes': 'filtroManutencoesForm', 
+                'checklists': 'filtroChecklistsForm',
+                'metricas': 'filtroMetricasForm'
+            };
+            
+            if (formIds[currentPage]) {
+                const savedFilters = FilterManager.applySavedFilters(currentPage, formIds[currentPage]);
+                if (savedFilters && typeof aplicarFiltros === 'function') {
+                    setTimeout(() => aplicarFiltros(), 100);
+                }
+            }
+
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            const tooltipList = tooltipTriggerList.map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+            
+            const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+            const popoverList = popoverTriggerList.map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function() {
+                    const button = this.querySelector('button[type="submit"]');
+                    if (button) {
+                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando...';
+                        button.disabled = true;
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

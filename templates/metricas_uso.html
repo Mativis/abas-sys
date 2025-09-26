@@ -1,0 +1,731 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-info text-white">
+        <i class="bi bi-speedometer"></i> Métricas de Uso - Controle de Troca de Óleo
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-plus-circle"></i> Cadastrar/Atualizar Troca de Óleo
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/metricas-uso" id="formTrocaOleo">
+                            <input type="hidden" name="identificacao_original" id="identificacao_original">
+                            <input type="hidden" name="tipo_original" id="tipo_original">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Identificação *</label>
+                                <select class="form-select" name="identificacao" id="identificacao" required>
+                                    <option value="">Selecione a identificação...</option>
+                                    {% for placa in placas %}
+                                        <option value="{{ placa }}">{{ placa }} (Veículo)</option>
+                                    {% endfor %}
+                                    {% for equipamento in identificacoes_equipamentos %}
+                                        <option value="{{ equipamento }}">{{ equipamento }} (Equipamento)</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Tipo *</label>
+                                <select class="form-select" name="tipo" id="tipo" required>
+                                    <option value="">Selecione o tipo...</option>
+                                    <option value="veiculo">Veículo</option>
+                                    <option value="maquina">Máquina</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Data da Última Troca *</label>
+                                <input type="date" class="form-control" name="data_troca" id="data_troca" required 
+                                       max="{{ now.strftime('%Y-%m-%d') }}">
+                            </div>
+                            
+                            <div class="mb-3" id="campo_km">
+                                <label class="form-label">KM na Última Troca *</label>
+                                <input type="number" step="0.1" class="form-control" name="km_troca" id="km_troca"
+                                       placeholder="Ex: 15000.0">
+                            </div>
+                            
+                            <div class="mb-3 d-none" id="campo_horimetro">
+                                <label class="form-label">Horímetro na Última Troca *</label>
+                                <input type="number" step="0.1" class="form-control" name="horimetro_troca" id="horimetro_troca"
+                                       placeholder="Ex: 1250.5">
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Salvar Dados
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btnCancelarEdicao" style="display: none;" onclick="cancelarEdicao()">
+                                <i class="bi bi-x-circle"></i> Cancelar Edição
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi-info-circle"></i> Informações
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6><i class="bi-lightbulb"></i> Como funciona:</h6>
+                            <p>O sistema calcula automaticamente que a próxima troca de óleo deve ser feita:</p>
+                            <ul>
+                                <li><strong>Veículos:</strong> A cada <strong>10.000 KM</strong> rodados após a última troca</li>
+                                <li><strong>Máquinas/Equipamentos:</strong> A cada <strong>350 horas</strong> de uso</li>
+                            </ul>
+                            <p>Os indicadores mostram o status baseado no critério mais crítico.</p>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h6><i class="bi-exclamation-triangle"></i> Atenção:</h6>
+                            <p>Para equipamentos, use a mesma identificação nos checklists para que o sistema possa acompanhar o horímetro atual.</p>
+                        </div>
+
+                        <div class="alert alert-light">
+                            <h6><i class="bi-gear"></i> Status do Sistema:</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <span class="badge bg-success">OK</span>
+                                    <small>Dentro do prazo</small>
+                                </div>
+                                <div class="col-6">
+                                    <span class="badge bg-warning">Atenção</span>
+                                    <small>&lt; 1000 KM ou &lt; 50 horas</small>
+                                </div>
+                                <div class="col-6 mt-2">
+                                    <span class="badge bg-danger">Vencido</span>
+                                    <small>KM ou horas excedidos</small>
+                                </div>
+                                <div class="col-6 mt-2">
+                                    <span class="badge bg-secondary">N/A</span>
+                                    <small>Sem dados</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard de Status -->
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card text-center bg-primary text-white">
+                    <div class="card-body">
+                        <h5><i class="bi-car-front"></i> Total</h5>
+                        <h3>{{ trocas_oleo|length }}</h3>
+                        <small>Itens com controle</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card text-center bg-warning text-dark">
+                    <div class="card-body">
+                        <h5><i class="bi-exclamation-triangle"></i> Atenção</h5>
+                        <h3>{{ trocas_oleo|selectattr('status', 'equalto', 'ATENÇÃO')|list|length }}</h3>
+                        <small>Próximos da troca</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card text-center bg-danger text-white">
+                    <div class="card-body">
+                        <h5><i class="bi-x-circle"></i> Atrasados</h5>
+                        <h3>{{ trocas_oleo|selectattr('status', 'equalto', 'VENCIDO')|list|length }}</h3>
+                        <small>Com troca vencida</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card text-center bg-success text-white">
+                    <div class="card-body">
+                        <h5><i class="bi-check-circle"></i> Em Dia</h5>
+                        <h3>{{ trocas_oleo|selectattr('status', 'equalto', 'OK')|list|length }}</h3>
+                        <small>Dentro do prazo</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros para a tabela -->
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel"></i> Filtros
+                    <button class="btn btn-sm btn-outline-primary float-end" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosTabela">
+                        <i class="bi bi-chevron-down"></i> Alternar
+                    </button>
+                </h5>
+            </div>
+            <div class="collapse show" id="filtrosTabela">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Identificação</label>
+                            <input type="text" id="filtroIdentificacao" class="form-control" placeholder="Filtrar por identificação...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select id="filtroStatus" class="form-select">
+                                <option value="todos">Todos</option>
+                                <option value="OK">Em Dia</option>
+                                <option value="ATENÇÃO">Atenção</option>
+                                <option value="VENCIDO">Vencido</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo</label>
+                            <select id="filtroTipo" class="form-select">
+                                <option value="todos">Todos</option>
+                                <option value="veiculo">Veículos</option>
+                                <option value="maquina">Máquinas</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="aplicarFiltros()">
+                                    <i class="bi bi-filter"></i> Aplicar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Controle -->
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi-table"></i> Controle de Troca de Óleo
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="exportarParaExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Exportar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="tabelaTrocasOleo">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Identificação</th>
+                                <th>Tipo</th>
+                                <th>Última Troca</th>
+                                <th class="text-end">Valor na Troca</th>
+                                <th class="text-end">Valor Atual</th>
+                                <th class="text-end">Próx. Troca</th>
+                                <th class="text-end">Restante</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for troca in trocas_oleo %}
+                            <tr data-identificacao="{{ troca.identificacao }}" data-status="{{ troca.status }}" data-tipo="{{ troca.tipo }}">
+                                <td><span class="badge bg-secondary">{{ troca.identificacao }}</span></td>
+                                <td>
+                                    {% if troca.tipo == 'veiculo' %}
+                                        <span class="badge bg-info">Veículo</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Máquina</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ troca.data_troca }}</td>
+                                
+                                {% if troca.tipo == 'veiculo' %}
+                                    <td class="text-end">{{ "%.1f"|format(troca.km_troca) if troca.km_troca else '-' }} KM</td>
+                                    <td class="text-end">{{ "%.1f"|format(troca.km_atual) if troca.km_atual else '-' }} KM</td>
+                                    <td class="text-end">{{ "%.1f"|format(troca.proxima_troca) if troca.proxima_troca else '-' }} KM</td>
+                                    <td class="text-end fw-bold {% if troca.remanescente is not none %}{% if troca.remanescente <= 0 %}text-danger{% elif troca.remanescente <= 1000 %}text-warning{% else %}text-success{% endif %}{% endif %}">
+                                        {{ "%.1f"|format(troca.remanescente) if troca.remanescente is not none else '-' }} KM
+                                    </td>
+                                {% else %}
+                                    <td class="text-end">{{ "%.1f"|format(troca.horimetro_troca) if troca.horimetro_troca else '-' }} H</td>
+                                    <td class="text-end">{{ "%.1f"|format(troca.horimetro_atual) if troca.horimetro_atual is not none else '-' }} H</td>
+                                    <td class="text-end">{{ "%.1f"|format(troca.proxima_troca) if troca.proxima_troca else '-' }} H</td>
+                                    <td class="text-end fw-bold {% if troca.remanescente is not none %}{% if troca.remanescente <= 0 %}text-danger{% elif troca.remanescente <= 50 %}text-warning{% else %}text-success{% endif %}{% endif %}">
+                                        {{ "%.1f"|format(troca.remanescente) if troca.remanescente is not none else '-' }} H
+                                    </td>
+                                {% endif %}
+                                
+                                <td class="text-center">
+                                    {% if troca.status == 'VENCIDO' %}
+                                        <span class="badge bg-danger">Vencido</span>
+                                    {% elif troca.status == 'ATENÇÃO' %}
+                                        <span class="badge bg-warning">Atenção</span>
+                                    {% else %}
+                                        <span class="badge bg-success">OK</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="editarTrocaOleo('{{ troca.identificacao }}', '{{ troca.tipo }}')" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        {% if troca.tipo == 'maquina' %}
+                                        <button class="btn btn-outline-info" onclick="visualizarChecklists('{{ troca.identificacao }}')" title="Checklists">
+                                            <i class="bi bi-clipboard-check"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-outline-danger" onclick="excluirTrocaOleo('{{ troca.identificacao }}', '{{ troca.tipo }}')" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <i class="bi-inbox display-6 text-muted"></i>
+                                    <p class="text-muted mt-2">Nenhum item com controle de troca de óleo cadastrado.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico de Status -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi-pie-chart"></i> Distribuição por Status
+            </div>
+            <div class="card-body">
+                <div class="grafico-container">
+                    <canvas id="statusChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para visualizar checklists -->
+<div class="modal fade" id="checklistsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Checklists Vinculados - <span id="modalIdentificacao"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="loadingChecklists" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Carregando checklists...</p>
+                </div>
+                <div id="checklistsContent" class="d-none">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Estes são os checklists relacionados a esta identificação.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th class="text-end">Horímetro</th>
+                                    <th class="text-center">Nível de Óleo</th>
+                                    <th>Observações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checklistsList">
+                                <!-- Conteúdo será preenchido via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="nenhumChecklist" class="text-center py-4 d-none">
+                        <i class="bi bi-inbox display-6 text-muted"></i>
+                        <p class="text-muted mt-2">Nenhum checklist vinculado a esta identificação.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Incluir Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Variáveis globais
+let dadosTrocas = {{ trocas_oleo|tojson }};
+let modoEdicao = false;
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar gráfico
+    const vencidos = {{ trocas_oleo|selectattr('status', 'equalto', 'VENCIDO')|list|length }};
+    const atencao = {{ trocas_oleo|selectattr('status', 'equalto', 'ATENÇÃO')|list|length }};
+    const emDia = {{ trocas_oleo|selectattr('status', 'equalto', 'OK')|list|length }};
+    
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Vencidos', 'Atenção', 'Em Dia'],
+            datasets: [{
+                data: [vencidos, atencao, emDia],
+                backgroundColor: ['#dc3545', '#ffc107', '#28a745'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                title: {
+                    display: true,
+                    text: 'Status das Trocas de Óleo'
+                }
+            }
+        }
+    });
+
+    // Configurar filtros
+    document.getElementById('filtroIdentificacao').addEventListener('input', aplicarFiltros);
+    document.getElementById('filtroStatus').addEventListener('change', aplicarFiltros);
+    document.getElementById('filtroTipo').addEventListener('change', aplicarFiltros);
+    
+    // Mostrar/ocultar campos baseado no tipo selecionado
+    document.getElementById('tipo').addEventListener('change', function() {
+        const tipo = this.value;
+        if (tipo === 'veiculo') {
+            document.getElementById('campo_km').classList.remove('d-none');
+            document.getElementById('campo_horimetro').classList.add('d-none');
+            document.querySelector('#campo_km input').setAttribute('required', 'required');
+            document.querySelector('#campo_horimetro input').removeAttribute('required');
+        } else if (tipo === 'maquina') {
+            document.getElementById('campo_km').classList.add('d-none');
+            document.getElementById('campo_horimetro').classList.remove('d-none');
+            document.querySelector('#campo_km input').removeAttribute('required');
+            document.querySelector('#campo_horimetro input').setAttribute('required', 'required');
+        }
+    });
+    
+    // Detectar tipo baseado na identificação selecionada
+    document.getElementById('identificacao').addEventListener('change', function() {
+        const identificacao = this.value;
+        const tipoSelect = document.getElementById('tipo');
+        
+        // Se a identificação contém "(Equipamento)", definir como máquina
+        if (identificacao.includes('(Equipamento)')) {
+            tipoSelect.value = 'maquina';
+            tipoSelect.dispatchEvent(new Event('change'));
+        } 
+        // Se a identificação contém "(Veículo)", definir como veículo
+        else if (identificacao.includes('(Veículo)')) {
+            tipoSelect.value = 'veiculo';
+            tipoSelect.dispatchEvent(new Event('change'));
+        }
+    });
+
+    // Prevenir envio duplo do formulário
+    document.getElementById('formTrocaOleo').addEventListener('submit', function(e) {
+        const submitButton = this.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
+    });
+});
+
+// Funções de filtro
+function aplicarFiltros() {
+    const filtroIdentificacao = document.getElementById('filtroIdentificacao').value.toLowerCase();
+    const filtroStatus = document.getElementById('filtroStatus').value;
+    const filtroTipo = document.getElementById('filtroTipo').value;
+    
+    const linhas = document.querySelectorAll('#tabelaTrocasOleo tbody tr');
+    
+    linhas.forEach(linha => {
+        const identificacao = linha.getAttribute('data-identificacao').toLowerCase();
+        const status = linha.getAttribute('data-status');
+        const tipo = linha.getAttribute('data-tipo');
+        
+        let exibir = true;
+        
+        // Aplicar filtro de identificação
+        if (filtroIdentificacao && !identificacao.includes(filtroIdentificacao)) {
+            exibir = false;
+        }
+        
+        // Aplicar filtro de status
+        if (filtroStatus !== 'todos' && status !== filtroStatus) {
+            exibir = false;
+        }
+        
+        // Aplicar filtro de tipo
+        if (filtroTipo !== 'todos' && tipo !== filtroTipo) {
+            exibir = false;
+        }
+        
+        linha.style.display = exibir ? '' : 'none';
+    });
+}
+
+// Funções de edição
+function editarTrocaOleo(identificacao, tipo) {
+    fetch(`/api/troca-oleo/${encodeURIComponent(identificacao)}/${tipo}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const troca = data.data;
+                
+                // Preencher o formulário de edição
+                document.getElementById('identificacao_original').value = troca.identificacao;
+                document.getElementById('tipo_original').value = troca.tipo;
+                document.getElementById('identificacao').value = troca.identificacao;
+                document.getElementById('tipo').value = troca.tipo;
+                document.getElementById('data_troca').value = troca.data_troca;
+                
+                // Mostrar campos apropriados baseado no tipo
+                if (troca.tipo === 'veiculo') {
+                    document.getElementById('campo_km').classList.remove('d-none');
+                    document.getElementById('campo_horimetro').classList.add('d-none');
+                    document.getElementById('km_troca').value = troca.km_troca;
+                } else {
+                    document.getElementById('campo_km').classList.add('d-none');
+                    document.getElementById('campo_horimetro').classList.remove('d-none');
+                    document.getElementById('horimetro_troca').value = troca.horimetro_troca;
+                }
+                
+                // Mudar para modo edição
+                modoEdicao = true;
+                document.getElementById('btnCancelarEdicao').style.display = 'inline-block';
+                
+                // Rolar até o formulário
+                document.getElementById('formTrocaOleo').scrollIntoView({ behavior: 'smooth' });
+                
+            } else {
+                showAlert('Erro ao carregar dados: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro ao carregar dados da troca de óleo', 'danger');
+        });
+}
+
+function cancelarEdicao() {
+    // Limpar o formulário
+    document.getElementById('formTrocaOleo').reset();
+    document.getElementById('identificacao_original').value = '';
+    document.getElementById('tipo_original').value = '';
+    document.getElementById('btnCancelarEdicao').style.display = 'none';
+    modoEdicao = false;
+    
+    // Ocultar campos extras
+    document.getElementById('campo_km').classList.add('d-none');
+    document.getElementById('campo_horimetro').classList.add('d-none');
+}
+
+// Função para visualizar checklists vinculados
+function visualizarChecklists(identificacao) {
+    document.getElementById('modalIdentificacao').textContent = identificacao;
+    document.getElementById('loadingChecklists').classList.remove('d-none');
+    document.getElementById('checklistsContent').classList.add('d-none');
+    document.getElementById('nenhumChecklist').classList.add('d-none');
+    
+    fetch(`/api/checklists/${encodeURIComponent(identificacao)}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingChecklists').classList.add('d-none');
+            
+            if (data.success && data.checklists && data.checklists.length > 0) {
+                document.getElementById('checklistsContent').classList.remove('d-none');
+                
+                const tbody = document.getElementById('checklistsList');
+                tbody.innerHTML = '';
+                
+                data.checklists.forEach(checklist => {
+                    const row = document.createElement('tr');
+                    
+                    // Determinar classe do nível de óleo
+                    let nivelOleoClass = 'secondary';
+                    let nivelOleoText = 'N/A';
+                    if (checklist.nivel_oleo) {
+                        nivelOleoText = checklist.nivel_oleo;
+                        if (checklist.nivel_oleo === 'ADEQUADO') nivelOleoClass = 'success';
+                        else if (checklist.nivel_oleo === 'BAIXO') nivelOleoClass = 'warning';
+                        else if (checklist.nivel_oleo === 'CRÍTICO') nivelOleoClass = 'danger';
+                    }
+                    
+                    row.innerHTML = `
+                        <td>${checklist.data}</td>
+                        <td class="text-end">${checklist.horimetro ? checklist.horimetro.toFixed(1) : '-'}</td>
+                        <td class="text-center">
+                            <span class="badge bg-${nivelOleoClass}">${nivelOleoText}</span>
+                        </td>
+                        <td>${checklist.observacoes || '-'}</td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            } else {
+                document.getElementById('nenhumChecklist').classList.remove('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar checklists:', error);
+            document.getElementById('loadingChecklists').classList.add('d-none');
+            document.getElementById('nenhumChecklist').classList.remove('d-none');
+        });
+    
+    new bootstrap.Modal(document.getElementById('checklistsModal')).show();
+}
+
+function excluirTrocaOleo(identificacao, tipo) {
+    if (confirm(`Tem certeza que deseja excluir o registro de troca de óleo para ${identificacao} (${tipo})?`)) {
+        fetch(`/api/trocas-oleo/${encodeURIComponent(identificacao)}/${tipo}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Registro excluído com sucesso!', 'success');
+                // Recarregar a página após um breve delay
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Erro ao excluir: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro ao excluir registro', 'danger');
+        });
+    }
+}
+
+// Função para exportar para Excel
+function exportarParaExcel() {
+    const tabela = document.getElementById('tabelaTrocasOleo');
+    let csv = [];
+    
+    // Cabeçalhos
+    const headers = [];
+    for (let i = 0; i < tabela.rows[0].cells.length; i++) {
+        headers.push(tabela.rows[0].cells[i].textContent.trim());
+    }
+    csv.push(headers.join(';'));
+    
+    // Dados
+    for (let i = 1; i < tabela.rows.length; i++) {
+        if (tabela.rows[i].style.display !== 'none') { // Apenas linhas visíveis
+            const row = [];
+            for (let j = 0; j < tabela.rows[i].cells.length; j++) {
+                row.push(tabela.rows[i].cells[j].textContent.trim());
+            }
+            csv.push(row.join(';'));
+        }
+    }
+    
+    // Criar arquivo
+    const csvContent = "data:text/csv;charset=utf-8," + csv.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "controle_troca_oleo_" + new Date().toISOString().split('T')[0] + ".csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Função auxiliar para mostrar alertas
+function showAlert(message, type) {
+    // Remover alertas existentes
+    const alertasExistentes = document.querySelectorAll('.alert');
+    alertasExistentes.forEach(alerta => alerta.remove());
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.navbar').nextElementSibling);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<style>
+.grafico-container {
+    position: relative;
+    height: 300px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.badge {
+    font-size: 0.85em;
+}
+
+/* Estilo para os filtros */
+#filtrosTabela {
+    transition: all 0.3s ease;
+}
+
+.collapse.show {
+    visibility: visible;
+}
+
+/* Ajuste para tabela responsiva */
+@media (max-width: 1200px) {
+    .table-responsive {
+        overflow-x: auto;
+    }
+    
+    #tabelaTrocasOleo {
+        min-width: 800px;
+    }
+}
+
+.btn-group .btn {
+    border-radius: 0.375rem;
+    margin-right: 0.25rem;
+}
+
+.btn-group .btn:last-child {
+    margin-right: 0;
+}
+</style>
+{% endblock %}

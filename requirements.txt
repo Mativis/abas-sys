@@ -1,0 +1,8 @@
+flask
+pandas
+openpyxl
+matplotlib
+gunicorn
+selenium
+pandas
+sqlalchemy

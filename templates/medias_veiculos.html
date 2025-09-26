@@ -8,51 +8,71 @@
                 <i class="bi bi-speedometer2"></i> Médias de Consumo por Veículo
             </div>
             <div>
-                <button class="btn btn-light btn-sm" onclick="location.reload()">
+                <button class="btn btn-light btn-sm" onclick="atualizarDados()">
                     <i class="bi bi-arrow-clockwise"></i> Atualizar
                 </button>
             </div>
         </div>
     </div>
     <div class="card-body">
-        <form id="formFiltros" method="post" action="{{ url_for('medias_veiculos') }}">
-            <div class="card mb-4">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="bi bi-funnel"></i> Filtros de Período
-                    </h5>
-                </div>
+        <!-- Filtros Expandidos -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel"></i> Filtros
+                    <button class="btn btn-sm btn-outline-primary float-end" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosAvancados">
+                        <i class="bi bi-chevron-down"></i> Alternar
+                    </button>
+                </h5>
+            </div>
+            <div class="collapse show" id="filtrosAvancados">
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Data Início</label>
-                            <input type="date" id="filtroDataInicio" name="data_inicio" class="form-control"
-                                   value="{{ filtros.data_inicio }}">
+                        <div class="col-md-3">
+                            <label class="form-label">Placa</label>
+                            <input type="text" id="filtroPlaca" class="form-control" placeholder="Filtrar por placa...">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Data Fim</label>
-                            <input type="date" id="filtroDataFim" name="data_fim" class="form-control"
-                                   value="{{ filtros.data_fim }}">
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select id="filtroStatus" class="form-select">
+                                <option value="todos">Todos</option>
+                                <option value="ativo">Ativos</option>
+                                <option value="inativo">Inativos</option>
+                            </select>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end gap-2">
-                            <button type="submit" class="btn btn-primary flex-grow-1">
+                        <div class="col-md-3">
+                            <label class="form-label">Consumo (KM/L)</label>
+                            <select id="filtroConsumo" class="form-select">
+                                <option value="todos">Todos</option>
+                                <option value="0-7">Baixo (0-7 KM/L)</option>
+                                <option value="7-10">Médio (7-10 KM/L)</option>
+                                <option value="10+">Alto (10+ KM/L)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Período</label>
+                            <select id="filtroPeriodo" class="form-select">
+                                <option value="todos">Todos os registros</option>
+                                <option value="30">Últimos 30 dias</option>
+                                <option value="90">Últimos 3 meses</option>
+                                <option value="180">Últimos 6 meses</option>
+                                <option value="365">Último ano</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" onclick="aplicarFiltros()">
                                 <i class="bi bi-filter"></i> Aplicar Filtros
                             </button>
-                            <button type="button" class="btn btn-outline-secondary flex-grow-1" onclick="limparFiltros()">
+                            <button class="btn btn-outline-secondary" onclick="limparFiltros()">
                                 <i class="bi bi-x-circle"></i> Limpar
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </form>
-
-        <div class="d-flex justify-content-end mb-4">
-            <button type="button" class="btn btn-outline-primary" onclick="imprimirRelatorio()">
-                <i class="bi bi-printer"></i> Imprimir Relatório
-            </button>
         </div>
-        
+
+        <!-- Cards de Resumo -->
         <div class="row mb-4">
             <div class="col-md-3">
                 <div class="card text-center bg-primary text-white">
@@ -92,6 +112,7 @@
             </div>
         </div>
 
+        <!-- Gráfico e Tabela -->
         <div class="row">
             <div class="col-md-6">
                 <div class="card mb-4">
@@ -141,6 +162,7 @@
             </div>
         </div>
 
+        <!-- Gráfico de Gasto -->
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
@@ -158,6 +180,7 @@
     </div>
 </div>
 
+<!-- Modal de Detalhes -->
 <div class="modal fade" id="detalhesModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -252,34 +275,114 @@
     </div>
 </div>
 
+<!-- Incluir Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 // Variáveis globais
-let dadosMedias = {{ dados|tojson }};
+let dadosMedias = [];
 let graficoKML = null;
 let graficoGastos = null;
-
-// Configuração inicial dos filtros com base no que foi recebido do backend
 let filtrosAtivos = {
-    data_inicio: '{{ filtros.data_inicio }}',
-    data_fim: '{{ filtros.data_fim }}'
+    placa: '',
+    status: 'todos',
+    consumo: 'todos',
+    periodo: 'todos'
 };
 
+// Carregar dados ao iniciar
 document.addEventListener('DOMContentLoaded', function() {
-    // A página já carrega os dados com base nos filtros do backend
-    aplicarFiltrosNaPagina();
+    carregarDados();
+    configurarFiltros();
 });
 
-function aplicarFiltrosNaPagina() {
+function carregarDados() {
+    fetch('/medias-veiculos-dados')
+        .then(response => response.json())
+        .then(data => {
+            dadosMedias = data;
+            aplicarFiltros();
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dados:', error);
+            document.getElementById('corpoTabela').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-danger py-4">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <p>Erro ao carregar dados. Tente novamente.</p>
+                    </td>
+                </tr>
+            `;
+        });
+}
+
+function configurarFiltros() {
+    // Filtro de placa
+    document.getElementById('filtroPlaca').addEventListener('input', function() {
+        filtrosAtivos.placa = this.value;
+        aplicarFiltros();
+    });
+    
+    // Filtro de status
+    document.getElementById('filtroStatus').addEventListener('change', function() {
+        filtrosAtivos.status = this.value;
+        aplicarFiltros();
+    });
+    
+    // Filtro de consumo
+    document.getElementById('filtroConsumo').addEventListener('change', function() {
+        filtrosAtivos.consumo = this.value;
+        aplicarFiltros();
+    });
+    
+    // Filtro de período
+    document.getElementById('filtroPeriodo').addEventListener('change', function() {
+        filtrosAtivos.periodo = this.value;
+        aplicarFiltros();
+    });
+}
+
+function aplicarFiltros() {
     let dadosFiltrados = [...dadosMedias];
     
     // Aplicar filtro de placa
-    const filtroPlaca = document.getElementById('filtroPlaca').value;
-    if (filtroPlaca) {
+    if (filtrosAtivos.placa) {
         dadosFiltrados = dadosFiltrados.filter(veiculo => 
-            veiculo.placa.toLowerCase().includes(filtroPlaca.toLowerCase())
+            veiculo.placa.toLowerCase().includes(filtrosAtivos.placa.toLowerCase())
         );
+    }
+    
+    // Aplicar filtro de status
+    if (filtrosAtivos.status !== 'todos') {
+        dadosFiltrados = dadosFiltrados.filter(veiculo => {
+            const status = veiculo.km_atual && veiculo.km_atual > 0;
+            return filtrosAtivos.status === 'ativo' ? status : !status;
+        });
+    }
+    
+    // Aplicar filtro de consumo
+    if (filtrosAtivos.consumo !== 'todos') {
+        dadosFiltrados = dadosFiltrados.filter(veiculo => {
+            if (!veiculo.media_kml) return false;
+            
+            switch(filtrosAtivos.consumo) {
+                case '0-7':
+                    return veiculo.media_kml <= 7;
+                case '7-10':
+                    return veiculo.media_kml > 7 && veiculo.media_kml <= 10;
+                case '10+':
+                    return veiculo.media_kml > 10;
+                default:
+                    return true;
+            }
+        });
+    }
+    
+    // Aplicar filtro de período (simulado - em produção, isso viria do backend)
+    if (filtrosAtivos.periodo !== 'todos') {
+        // Em uma implementação real, isso seria filtrado no backend
+        // Aqui estamos apenas simulando o filtro
+        console.log('Filtro de período selecionado:', filtrosAtivos.periodo);
     }
     
     // Ordenar por KM/L decrescente por padrão
@@ -290,13 +393,20 @@ function aplicarFiltrosNaPagina() {
     atualizarResumo(dadosFiltrados);
 }
 
-function aplicarFiltros() {
-    const form = document.getElementById('formFiltros');
-    form.submit();
-}
-
 function limparFiltros() {
-    window.location.href = '{{ url_for("medias_veiculos") }}';
+    document.getElementById('filtroPlaca').value = '';
+    document.getElementById('filtroStatus').value = 'todos';
+    document.getElementById('filtroConsumo').value = 'todos';
+    document.getElementById('filtroPeriodo').value = 'todos';
+    
+    filtrosAtivos = {
+        placa: '',
+        status: 'todos',
+        consumo: 'todos',
+        periodo: 'todos'
+    };
+    
+    aplicarFiltros();
 }
 
 function atualizarTabela(dados) {
@@ -321,6 +431,7 @@ function atualizarTabela(dados) {
         const totalGasto = veiculo.total_gasto ? veiculo.total_gasto.toFixed(2) : '0.00';
         const status = veiculo.km_atual && veiculo.km_atual > 0;
         
+        // Cor baseada no consumo
         let corKml = 'secondary';
         if (veiculo.media_kml) {
             if (veiculo.media_kml > 10) corKml = 'success';
@@ -359,12 +470,15 @@ function atualizarTabela(dados) {
 }
 
 function atualizarGraficos(dados) {
+    // Dados para gráficos (apenas veículos com dados válidos)
     const dadosValidos = dados.filter(v => v.media_kml && v.total_gasto);
     
     if (dadosValidos.length === 0) {
+        // Limpar gráficos se não houver dados
         if (graficoKML) graficoKML.destroy();
         if (graficoGastos) graficoGastos.destroy();
         
+        // Mostrar mensagem de nenhum dado
         document.getElementById('graficoKML').getContext('2d').clearRect(0, 0, 
             document.getElementById('graficoKML').width, 
             document.getElementById('graficoKML').height);
@@ -374,9 +488,11 @@ function atualizarGraficos(dados) {
         return;
     }
 
+    // Ordenar por KM/L para o gráfico
     const dadosOrdenados = [...dadosValidos].sort((a, b) => b.media_kml - a.media_kml);
     const top10 = dadosOrdenados.slice(0, 10);
 
+    // Gráfico de KM/L
     const ctxKML = document.getElementById('graficoKML').getContext('2d');
     if (graficoKML) graficoKML.destroy();
     
@@ -418,9 +534,11 @@ function atualizarGraficos(dados) {
         }
     });
 
+    // Gráfico de pizza para gastos
     const ctxGastos = document.getElementById('graficoGastos').getContext('2d');
     if (graficoGastos) graficoGastos.destroy();
     
+    // Agrupar por placa para o gráfico de pizza
     const dadosGastos = dadosValidos
         .sort((a, b) => b.total_gasto - a.total_gasto)
         .slice(0, 8);
@@ -455,16 +573,20 @@ function atualizarGraficos(dados) {
 function atualizarResumo(dados) {
     const dadosValidos = dados.filter(v => v.media_kml && v.media_kml > 0);
     
+    // Total de veículos
     document.getElementById('total-veiculos').textContent = dados.length;
     
+    // Média geral (apenas veículos com dados válidos)
     const mediaGeral = dadosValidos.length > 0 
         ? dadosValidos.reduce((sum, v) => sum + v.media_kml, 0) / dadosValidos.length
         : 0;
     document.getElementById('media-geral').textContent = mediaGeral.toFixed(2);
     
+    // Gasto total
     const gastoTotal = dados.reduce((sum, v) => sum + (v.total_gasto || 0), 0);
     document.getElementById('gasto-total').textContent = `R$ ${gastoTotal.toFixed(2)}`;
     
+    // Melhor consumo
     const melhorConsumo = dadosValidos.length > 0
         ? Math.max(...dadosValidos.map(v => v.media_kml))
         : 0;
@@ -475,6 +597,7 @@ function mostrarDetalhes(placa) {
     const veiculo = dadosMedias.find(v => v.placa === placa);
     if (!veiculo) return;
 
+    // Preencher modal
     document.getElementById('modalTitulo').textContent = `Veículo: ${placa}`;
     document.getElementById('detalhePlaca').textContent = placa;
     document.getElementById('detalheKmAtual').textContent = veiculo.km_atual ? veiculo.km_atual.toFixed(1) + ' KM' : '-';
@@ -487,8 +610,10 @@ function mostrarDetalhes(placa) {
     document.getElementById('detalheStatus').textContent = status ? 'Ativo' : 'Inativo';
     document.getElementById('detalheStatus').className = status ? 'badge bg-success' : 'badge bg-secondary';
 
+    // Carregar histórico (simulado - você precisaria implementar esta função)
     carregarHistoricoVeiculo(placa);
 
+    // Abrir modal
     new bootstrap.Modal(document.getElementById('detalhesModal')).show();
 }
 
@@ -519,6 +644,7 @@ function carregarHistoricoVeiculo(placa) {
 
 function verRelatorioVeiculo() {
     const placa = document.getElementById('detalhePlaca').textContent;
+    // Redirecionar para relatórios com filtro da placa
     window.location.href = `/relatorios?placa=${placa}`;
 }
 
@@ -555,13 +681,6 @@ function showAlert(message, type) {
             alertDiv.remove();
         }
     }, 3000);
-}
-
-function imprimirRelatorio() {
-    const dataInicio = document.getElementById('filtroDataInicio').value;
-    const dataFim = document.getElementById('filtroDataFim').value;
-    
-    window.open(`/relatorio-medias-veiculos/imprimir?data_inicio=${dataInicio}&data_fim=${dataFim}`, '_blank');
 }
 </script>
 

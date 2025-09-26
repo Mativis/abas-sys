@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-rout
-as
-=======
-# app.py
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 import pandas as pd
 import os
@@ -39,13 +34,18 @@ from database import (
     excluir_troca_oleo,
     obter_troca_oleo_por_identificacao_tipo,
     atualizar_troca_oleo,
-    # NOVAS FUNÇÕES PARA MANUTENÇÕES
     obter_manutencoes,
     obter_manutencao_por_id,
     criar_manutencao,
     atualizar_manutencao,
     excluir_manutencao,
-    obter_estatisticas_manutencoes
+    obter_estatisticas_manutencoes,
+    obter_placas_veiculos,
+    criar_pedagio,
+    obter_pedagios_com_filtros,
+    obter_pedagio_por_id,
+    atualizar_pedagio,
+    excluir_pedagio
 )
 
 app = Flask(__name__)
@@ -398,42 +398,22 @@ def api_checklist(id):
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/medias-veiculos', methods=['GET', 'POST'])
+@app.route('/medias-veiculos')
 def medias_veiculos():
-    data_inicio = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-    data_fim = datetime.now().strftime('%Y-%m-%d')
-    
-    if request.method == 'POST':
-        data_inicio = request.form.get('data_inicio', data_inicio)
-        data_fim = request.form.get('data_fim', data_fim)
-        
     try:
-        dados = calcular_medias_veiculos(data_inicio, data_fim)
-        filtros = {'data_inicio': data_inicio, 'data_fim': data_fim}
-        
-        # Gerar gráfico estático
+        dados = calcular_medias_veiculos()
         df = pd.DataFrame(dados)
         if not df.empty:
-            gerar_grafico(df, 'placa', ['media_kml'], f'Média de KM/L por Veículo ({data_inicio} a {data_fim})', 'bar', 'grafico_kml.png')
-            
-        return render_template('medias_veiculos.html', 
-                               dados=dados, 
-                               filtros=filtros,
-                               active_page='medias')
+            gerar_grafico(df, 'placa', ['media_kml'], 'Média de KM/L por Veículo', 'bar', 'grafico_kml.png')
+        return render_template('medias_veiculos.html', dados=dados, active_page='medias')
     except Exception as e:
         flash(f'Erro ao calcular médias: {str(e)}', 'danger')
-        return render_template('medias_veiculos.html', 
-                               dados=[], 
-                               filtros={'data_inicio': data_inicio, 'data_fim': data_fim},
-                               active_page='medias')
+        return render_template('medias_veiculos.html', dados=[], active_page='medias')
 
 @app.route('/medias-veiculos-dados')
 def medias_veiculos_dados():
-    data_inicio = request.args.get('data_inicio')
-    data_fim = request.args.get('data_fim')
-    
     try:
-        dados = calcular_medias_veiculos(data_inicio, data_fim)
+        dados = calcular_medias_veiculos()
         return jsonify(dados)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -639,6 +619,101 @@ def gerenciar_registro(id):
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
 
+@app.route('/pedagios', methods=['GET', 'POST'])
+def pedagios():
+    """Página de gerenciamento e relatório de pedágios com filtros."""
+    placas_disponiveis = obter_placas_veiculos()
+    
+    if request.method == 'POST':
+        filtros = {
+            'data_inicio': request.form.get('data_inicio', '2023-01-01'),
+            'data_fim': request.form.get('data_fim', datetime.now().strftime('%Y-%m-%d')),
+            'placa': request.form.get('placa', '').strip() or None
+        }
+        
+        try:
+            pedagios = obter_pedagios_com_filtros(**filtros)
+            
+            if request.form.get('imprimir'):
+                return render_template(
+                    'relatorio_pedagios_impressao.html',
+                    pedagios=pedagios,
+                    filtros=filtros,
+                    data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M')
+                )
+            
+            return render_template('pedagios.html', 
+                                   active_page='pedagios',
+                                   pedagios=pedagios,
+                                   filtros=filtros,
+                                   placas_disponiveis=placas_disponiveis)
+        except Exception as e:
+            flash(f'Erro ao gerar relatório de pedágios: {str(e)}', 'danger')
+            return render_template('pedagios.html', 
+                                   active_page='pedagios',
+                                   pedagios=[],
+                                   placas_disponiveis=placas_disponiveis)
+
+    # Requisição GET inicial
+    filtros = {
+        'data_inicio': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
+        'data_fim': datetime.now().strftime('%Y-%m-%d'),
+        'placa': None
+    }
+    pedagios = obter_pedagios_com_filtros(**filtros)
+    
+    return render_template('pedagios.html', 
+                           active_page='pedagios',
+                           pedagios=pedagios,
+                           filtros=filtros,
+                           placas_disponiveis=placas_disponiveis)
+
+
+@app.route('/api/pedagios', methods=['POST'])
+def api_criar_pedagio():
+    """API para criar um novo registro de pedágio"""
+    try:
+        dados = request.get_json()
+        if not all([dados.get('data'), dados.get('placa'), dados.get('valor')]):
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+        
+        pedagio_id = criar_pedagio(dados)
+        if pedagio_id:
+            return jsonify({'success': True, 'id': pedagio_id})
+        return jsonify({'success': False, 'error': 'Erro ao criar registro de pedágio'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/pedagios/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+def api_gerenciar_pedagio(id):
+    """API para gerenciar um registro de pedágio específico"""
+    if request.method == 'GET':
+        try:
+            pedagio = obter_pedagio_por_id(id)
+            if pedagio:
+                return jsonify(pedagio)
+            return jsonify({'error': 'Registro de pedágio não encontrado'}), 404
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    elif request.method == 'PUT':
+        try:
+            dados = request.get_json()
+            if atualizar_pedagio(id, dados):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Nenhum registro atualizado'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+            
+    elif request.method == 'DELETE':
+        try:
+            if excluir_pedagio(id):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Nenhum registro excluído'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+
+
 @app.route('/static/<path:filename>')
 def static_files(filename):
     return send_from_directory(app.config['STATIC_FOLDER'], filename)
@@ -650,4 +725,3 @@ def inject_now():
 if __name__ == '__main__':
     criar_tabelas()
     app.run(debug=True, host='0.0.0.0', port='5005')
->>>>>>> c8257f5f3546d263682ae47bf4d82cdd659a8b5f

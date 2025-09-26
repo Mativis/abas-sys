@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Dashboard Resumido -->
+<div class="row mt-10">
+    <div class="col-30">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-dashboard"></i> Resumo do Sistema
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-2">
+                        <h4 id="total-abastecimentos">{{ total_abastecimentos }}</h4>
+                        <p class="text-muted">Abastecimentos</p>
+                    </div>
+                    <div class="col-md-2">
+                        <h4 id="total-veiculos-dash">{{ total_veiculos }}</h4>
+                        <p class="text-muted">Veículos</p>
+                    </div>
+                    <div class="col-md-2">
+                        <h4 id="contagem-manutencoes">{{ manutencoescount }}</h4>
+                        <p class="text-muted">manutencoes</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="gasto-total-dash">R$ {{ "%.2f"|format(gasto_total) }}</h4>
+                        <p class="text-muted">Total de abastecimentos</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="total-manutencoes-dash">R$ {{ "%.2f"|format(total_manutencoes) }}</h4>
+                        <p class="text-muted">Total de manutenções</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Carregar dados do dashboard ao iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    carregarDadosDashboard();
+});
+
+function carregarDadosDashboard() {
+    fetch('/api/dashboard')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('total-abastecimentos').textContent = data.total_abastecimentos.toLocaleString();
+                document.getElementById('total-veiculos-dash').textContent = data.total_veiculos.toLocaleString();
+                document.getElementById('total-manutencoes-dash').textContent = 'R$ ' + data.total_manutencoes.toLocaleString();
+                document.getElementById('gasto-total-dash').textContent = 'R$ ' + data.gasto_total.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            } else {
+                console.error('Erro ao carregar dados do dashboard:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dashboard:', error);
+        });
+}
+</script>
+
+<style>
+.card {
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.display-4 {
+    font-size: 2.5rem;
+}
+
+.btn {
+    margin-top: 10px;
+}
+</style>
+{% endblock %}
+[file content end]
