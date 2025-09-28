@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-file-earmark-text me-2"></i> Controle de Cotações
+        </div>
+        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novaCotacaoModal">
+            <i class="bi bi-plus-circle me-1"></i> Nova Cotação
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Item</th>
+                        <th>Solicitante</th>
+                        <th>Data Limite</th>
+                        <th>Status</th>
+                        <th>Fornecedor Fechado</th>
+                        <th class="text-end">Valor (R$)</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cotacao in cotacoes %}
+                    <tr id="row-{{ cotacao.id }}">
+                        <td>{{ cotacao.item }}</td>
+                        <td><span class="badge bg-secondary">{{ cotacao.solicitante }}</span></td>
+                        <td>{{ cotacao.data_limite }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if cotacao.status == 'Aberta' %}bg-warning
+                                {% elif cotacao.status == 'Fechada' %}bg-primary
+                                {% elif cotacao.status == 'Aprovada' %}bg-success
+                                {% else %}bg-danger{% endif %}">
+                                {{ cotacao.status }}
+                            </span>
+                        </td>
+                        <td>{{ cotacao.fornecedor_nome if cotacao.fornecedor_nome else '-' }}</td>
+                        <td class="text-end fw-bold">
+                            {% if cotacao.valor_fechado %}
+                                R$ {{ "%.2f"|format(cotacao.valor_fechado) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-info" onclick="detalhesCotacao({{ cotacao.id }})" title="Detalhes">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                
+                                {% if g.user.role == 'Comprador' and cotacao.status == 'Aberta' %}
+                                <button class="btn btn-outline-success" onclick="abrirModalFecharCotacao({{ cotacao.id }})" title="Fechar Cotação">
+                                    <i class="bi bi-currency-dollar"></i>
+                                </button>
+                                {% endif %}
+                                
+                                {% if g.user.role == 'Gestor' and cotacao.status == 'Fechada' %}
+                                <button class="btn btn-outline-success" onclick="aprovarCotacao({{ cotacao.id }})" title="Aprovar e Gerar Pedido">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="rejeitarCotacao({{ cotacao.id }})" title="Rejeitar Cotação">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">Nenhuma cotação cadastrada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="novaCotacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Solicitar Nova Cotação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('cotacoes') }}">
+                <input type="hidden" name="action" value="criar">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Item *</label>
+                        <input type="text" class="form-control" name="item" required>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Quantidade *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" name="quantidade" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data Limite de Necessidade *</label>
+                            <input type="date" class="form-control" name="data_limite" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" name="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send me-1"></i> Enviar Solicitação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="fecharCotacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Fechar Cotação: <span id="cotacaoItemTitle"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('cotacoes') }}" id="formFecharCotacao">
+                <input type="hidden" name="action" value="fechar">
+                <input type="hidden" name="cotacao_id" id="fechar_cotacao_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Fornecedor Fechado *</label>
+                        <select class="form-select" name="fornecedor_id" required>
+                            <option value="">Selecione o Fornecedor...</option>
+                            {% for forn in fornecedores %}
+                                <option value="{{ forn.id }}">{{ forn.nome }} ({{ forn.cnpj }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Valor Fechado (R$) *</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" name="valor_fechado" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Prazo de Pagamento</label>
+                        <input type="text" class="form-control" name="prazo_pagamento" placeholder="Ex: 30/60/90, 28 DDL">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Faturamento</label>
+                        <input type="text" class="form-control" name="faturamento" placeholder="Ex: CNPJ do Faturamento">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-lock me-1"></i> Fechar e Aguardar Aprovação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detalhesCotacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Cotação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detalhesCotacaoConteudo">
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function abrirModalFecharCotacao(cotacaoId) {
+        const cotacao = {{ cotacoes|tojson }}.find(c => c.id == cotacaoId);
+        document.getElementById('fechar_cotacao_id').value = cotacaoId;
+        document.getElementById('cotacaoItemTitle').textContent = cotacao.item;
+        
+        // Preencher dados existentes se houver
+        document.querySelector('#formFecharCotacao [name="valor_fechado"]').value = cotacao.valor_fechado || '';
+        document.querySelector('#formFecharCotacao [name="prazo_pagamento"]').value = cotacao.prazo_pagamento || '';
+        document.querySelector('#formFecharCotacao [name="faturamento"]').value = cotacao.faturamento || '';
+        document.querySelector('#formFecharCotacao [name="fornecedor_id"]').value = cotacao.fornecedor_id || '';
+
+        new bootstrap.Modal(document.getElementById('fecharCotacaoModal')).show();
+    }
+
+    function detalhesCotacao(cotacaoId) {
+        const cotacao = {{ cotacoes|tojson }}.find(c => c.id == cotacaoId);
+        
+        const html = `
+            <p><strong>Item:</strong> ${cotacao.item} (x${cotacao.quantidade})</p>
+            <p><strong>Solicitante:</strong> ${cotacao.solicitante}</p>
+            <p><strong>Data Limite:</strong> ${cotacao.data_limite}</p>
+            <p><strong>Status:</strong> <span class="badge bg-${cotacao.status == 'Aprovada' ? 'success' : (cotacao.status == 'Fechada' ? 'primary' : 'warning')}">${cotacao.status}</span></p>
+            <hr>
+            <h6>Detalhes de Fechamento:</h6>
+            <p><strong>Fornecedor Fechado:</strong> ${cotacao.fornecedor_nome || '-'}</p>
+            <p><strong>Valor Fechado:</strong> ${cotacao.valor_fechado ? 'R$ ' + parseFloat(cotacao.valor_fechado).toFixed(2) : '-'}</p>
+            <p><strong>Prazo de Pagamento:</strong> ${cotacao.prazo_pagamento || '-'}</p>
+            <p><strong>Faturamento:</strong> ${cotacao.faturamento || '-'}</p>
+            <hr>
+            <h6>Observações:</h6>
+            <p>${cotacao.observacoes || '-'}</p>
+        `;
+        document.getElementById('detalhesCotacaoConteudo').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('detalhesCotacaoModal')).show();
+    }
+
+    function aprovarCotacao(cotacaoId) {
+        if (confirm(`Tem certeza que deseja APROVAR a Cotação #${cotacaoId} e GERAR um Pedido de Compra?`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("cotacoes") }}';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'aprovar';
+            form.appendChild(actionInput);
+            
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'cotacao_id';
+            idInput.value = cotacaoId;
+            form.appendChild(idInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    function rejeitarCotacao(cotacaoId) {
+        // Lógica de rejeição (a ser implementada no app.py)
+        alert('Funcionalidade de Rejeição pendente de implementação no backend.');
+    }
+</script>
+{% endblock %}
