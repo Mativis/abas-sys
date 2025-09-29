@@ -1123,7 +1123,7 @@ def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimet
         cursor.execute('''
             UPDATE trocas_oleo 
             SET data_troca = ?, km_troca = ?, horimetro_troca = ?, 
-                proxima_troca_km = ?, proxima_troca_horimetro = ?
+                    proxima_troca_km = ?, proxima_troca_horimetro = ?
             WHERE identificacao = ? AND tipo = ?
         ''', (data_troca, km_troca, horimetro_troca, proxima_troca_km, proxima_troca_horimetro, identificacao, tipo))
         
