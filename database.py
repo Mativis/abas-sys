@@ -120,15 +120,24 @@ def criar_cotacao_com_itens(user_id, dados):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # 1. Cria o cabeçalho da cotação, agora incluindo o STATUS
         cursor.execute('''
-            INSERT INTO cotacoes (user_id, titulo, data_limite, observacoes, data_registro)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO cotacoes (user_id, titulo, data_limite, observacoes, status, data_registro)
+            VALUES (?, ?, ?, ?, 'Aberta', ?)
         ''', (user_id, dados['titulo'], dados['data_limite'], dados.get('observacoes', ''), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         cotacao_id = cursor.lastrowid
+
+        # 2. Insere os itens da cotação
+        itens_para_inserir = []
+        for item in dados['itens']:
+            itens_para_inserir.append((
+                cotacao_id, item['descricao'], float(item['quantidade'])
+            ))
         
-        itens_para_inserir = [(cotacao_id, item['descricao'], float(item['quantidade'])) for item in dados['itens']]
-        
-        cursor.executemany('INSERT INTO cotacao_itens (cotacao_id, descricao, quantidade) VALUES (?, ?, ?)', itens_para_inserir)
+        cursor.executemany('''
+            INSERT INTO cotacao_itens (cotacao_id, descricao, quantidade)
+            VALUES (?, ?, ?)
+        ''', itens_para_inserir)
         
         conn.commit()
         return cotacao_id
@@ -191,25 +200,37 @@ def adicionar_orcamento(dados):
         conn.close()
 
 def aprovar_orcamento(orcamento_id, user_id):
-    """Aprova um orçamento, atualiza status e cria um Pedido de Compra com múltiplos itens."""
+    """
+    Aprova um orçamento, atualiza status e cria um Pedido de Compra.
+    Garante que apenas um orçamento seja marcado como 'aprovado' por cotação.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # Pega os dados do orçamento que será aprovado
         orcamento = pd.read_sql('SELECT * FROM orcamentos WHERE id = ?', conn, params=(orcamento_id,)).iloc[0].to_dict()
         cotacao_id = orcamento['cotacao_id']
         
-        # 1. Marca o orçamento como aprovado e atualiza a cotação
+        # --- LÓGICA DE CORREÇÃO ---
+        # 1. Primeiro, redefine o status de TODOS os orçamentos para esta cotação como NÃO aprovado.
+        #    Isso previne que múltiplos orçamentos fiquem com o status de aprovado.
+        cursor.execute("UPDATE orcamentos SET aprovado = 0 WHERE cotacao_id = ?", (cotacao_id,))
+        
+        # 2. Em seguida, marca APENAS o orçamento selecionado como APROVADO.
         cursor.execute("UPDATE orcamentos SET aprovado = 1 WHERE id = ?", (orcamento_id,))
+        # --- FIM DA CORREÇÃO ---
+
+        # 3. Atualiza o status da cotação-mãe para 'Aprovada'
         cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ?", (datetime.now().strftime('%Y-%m-%d'), cotacao_id))
 
-        # 2. Cria o cabeçalho do Pedido de Compra
+        # 4. Cria o Pedido de Compra
         cursor.execute('''
             INSERT INTO pedidos_compra (cotacao_id, user_id, fornecedor_id, valor_total, data_abertura, status)
             VALUES (?, ?, ?, ?, ?, 'Aberto')
         ''', (cotacao_id, user_id, orcamento['fornecedor_id'], orcamento['valor'], datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         pedido_id = cursor.lastrowid
 
-        # 3. Copia os itens da cotação para o pedido
+        # 5. Copia os itens da cotação para o pedido
         itens_cotacao = obter_itens_por_cotacao_id(cotacao_id)
         itens_pedido = [(pedido_id, item['descricao'], item['quantidade']) for item in itens_cotacao]
         cursor.executemany('INSERT INTO pedido_itens (pedido_id, descricao, quantidade) VALUES (?, ?, ?)', itens_pedido)
@@ -222,7 +243,7 @@ def aprovar_orcamento(orcamento_id, user_id):
         return None
     finally:
         conn.close()
-
+    
 def obter_orcamentos_por_cotacao_id(cotacao_id):
     """Busca todos os orçamentos de uma cotação específica."""
     conn = get_db_connection()
@@ -237,10 +258,11 @@ def obter_orcamentos_por_cotacao_id(cotacao_id):
     conn.close()
     return df.to_dict('records')
 
-# --- Funções de Pedido de Compra (REESTRUTURADAS) ---
+# --- Funções de Pedido de Compra (CORRIGIDAS) ---
 
 def obter_pedidos_compra():
     conn = get_db_connection()
+    # CORREÇÃO: JOIN com fornecedores via p.fornecedor_id
     query = '''
         SELECT
             p.id, p.cotacao_id, p.status, p.data_abertura, p.valor_total,
@@ -256,6 +278,7 @@ def obter_pedidos_compra():
 
 def obter_pedido_compra_por_id(pedido_id):
     conn = get_db_connection()
+    # CORREÇÃO: JOIN com fornecedores via p.fornecedor_id
     query = '''
         SELECT p.*, f.nome as fornecedor_nome, f.cnpj as fornecedor_cnpj
         FROM pedidos_compra p
@@ -285,7 +308,7 @@ def finalizar_pedido_compra(pedido_id, dados):
     finally:
         conn.close()
 
-# --- Funções de Dealer Intelligence (sem alterações) ---
+# --- (O resto das funções permanecem as mesmas) ---
 def obter_dealer_intelligence(data_inicio, data_fim):
     conn = get_db_connection()
     query_orcamentos = '''
@@ -333,9 +356,6 @@ def obter_dealer_intelligence(data_inicio, data_fim):
         'media_dias_processamento': media_dias_processamento if pd.notna(media_dias_processamento) else 0,
         'relatorio_processamento': relatorio_processamento
     }
-    
-# --- Funções de Usuários, Fornecedores e Frotas (sem alterações, omitidas para brevidade) ---
-# ... (cole aqui as outras funções do seu database.py) ...
 
 def get_user_by_username(username):
     conn = get_db_connection()
@@ -350,14 +370,12 @@ def get_user_by_id(user_id):
     return user
 
 def get_all_users():
-    """Retorna todos os usuários (id, username, role)."""
     conn = get_db_connection()
     df = pd.read_sql("SELECT id, username, role FROM users ORDER BY role, username", conn)
     conn.close()
     return df.to_dict('records')
 
 def create_user(username, password, role):
-    """Cria um novo usuário."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -368,14 +386,13 @@ def create_user(username, password, role):
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        return False # Username already exists
+        return False
     except ValueError:
         return False
     finally:
         conn.close()
 
 def update_user(user_id, username, role, password=None):
-    """Atualiza dados de um usuário (incluindo senha opcionalmente)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -391,14 +408,13 @@ def update_user(user_id, username, role, password=None):
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.IntegrityError:
-        return False # Username conflict
+        return False
     except ValueError:
         return False
     finally:
         conn.close()
 
 def delete_user(user_id):
-    """Exclui um usuário pelo ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -419,7 +435,7 @@ def criar_fornecedor(dados):
         conn.commit()
         return cursor.lastrowid
     except sqlite3.IntegrityError:
-        return False # CNPJ duplicado
+        return False
     finally:
         conn.close()
 
@@ -428,81 +444,6 @@ def obter_fornecedores():
     df = pd.read_sql('SELECT id, cnpj, nome, ie, tipo, contato, data_registro FROM fornecedores ORDER BY nome', conn)
     conn.close()
     return df.to_dict('records')
-
-def criar_cotacao(user_id, dados):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT INTO cotacoes (user_id, item, quantidade, data_limite, observacoes)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user_id, dados['item'], float(dados['quantidade']), dados['data_limite'], dados['observacoes']))
-        conn.commit()
-        return cursor.lastrowid
-    finally:
-        conn.close()
-
-def obter_pedidos_compra():
-    conn = get_db_connection()
-    query = '''
-        SELECT 
-            p.*, 
-            u.username as comprador,
-            f.nome as fornecedor_nome
-        FROM pedidos_compra p
-        JOIN users u ON p.user_id = u.id
-        LEFT JOIN fornecedores f ON p.fornecedor_cnpj = f.cnpj
-        ORDER BY p.data_abertura DESC
-    '''
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df.to_dict('records')
-
-def obter_pedido_compra_por_id(id):
-    conn = get_db_connection()
-    query = '''
-        SELECT 
-            p.*, 
-            u.username as comprador,
-            f.nome as fornecedor_nome
-        FROM pedidos_compra p
-        JOIN users u ON p.user_id = u.id
-        LEFT JOIN fornecedores f ON p.fornecedor_cnpj = f.cnpj
-        WHERE p.id = ?
-    '''
-    df = pd.read_sql(query, conn, params=(id,))
-    conn.close()
-    if not df.empty:
-        return df.iloc[0].to_dict()
-    return None
-
-def atualizar_pedido_compra(id, dados):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE pedidos_compra 
-            SET item = ?, quantidade = ?, valor = ?, status = ?
-            WHERE id = ?
-        ''', (dados['item'], float(dados['quantidade']), float(dados['valor']), dados['status'], id))
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
-
-def finalizar_pedido_compra(id, dados):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE pedidos_compra 
-            SET status = 'Finalizado', data_finalizacao = ?, nf_e_chave = ?, nfs_pdf_path = ?
-            WHERE id = ? AND status != 'Finalizado'
-        ''', (datetime.now().strftime('%Y-%m-%d'), dados.get('nf_e_chave'), dados.get('nfs_pdf_path'), id))
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
 
 def obter_precos_combustivel(): 
     conn = get_db_connection()
@@ -736,7 +677,6 @@ def criar_registro(dados):
         conn.close()
 
 def excluir_registro(id):
-    """Exclui um registro de abastecimento pelo ID. (Função solicitada para correção)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -1009,7 +949,6 @@ def obter_estatisticas_manutencoes():
         conn.close()
 
 def obter_checklists():
-    """Obtém todos os checklists (necessário para a listagem da rota /checklists)"""
     conn = get_db_connection()
     try:
         query = "SELECT * FROM checklists ORDER BY data DESC"
@@ -1022,7 +961,6 @@ def obter_checklists():
         conn.close()
     
 def obter_manutencao_por_id(id):
-    """Busca uma manutenção específica por ID (manutenções.html)"""
     conn = get_db_connection()
     try:
         query = """
@@ -1046,7 +984,6 @@ def obter_manutencao_por_id(id):
         conn.close()
 
 def criar_manutencao(dados):
-    """Cria uma nova manutenção (api_manutencoes POST)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
@@ -1075,7 +1012,6 @@ def criar_manutencao(dados):
         conn.close()
 
 def atualizar_manutencao(id, dados):
-    """Atualiza uma manutenção existente (api_manutencoes PUT)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
@@ -1105,7 +1041,6 @@ def atualizar_manutencao(id, dados):
         conn.close()
 
 def excluir_manutencao(id):
-    """Exclui uma manutenção pelo ID (api_manutencoes DELETE)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -1119,7 +1054,6 @@ def excluir_manutencao(id):
         conn.close()
 
 def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimetro_troca=None):
-    """Atualiza dados de troca de óleo (usada na lógica de metricas-uso, mas não exposta na API principal do app.py)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -1150,7 +1084,6 @@ def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimet
 
 
 def criar_checklist(dados):
-    """Cria um novo registro de checklist."""
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
@@ -1169,7 +1102,6 @@ def criar_checklist(dados):
         conn.close()
 
 def obter_checklist_por_id(id):
-    """Obtém um checklist específico pelo ID."""
     conn = get_db_connection()
     try:
         checklist = conn.execute('SELECT * FROM checklists WHERE id = ?', (id,)).fetchone()
@@ -1178,7 +1110,6 @@ def obter_checklist_por_id(id):
         conn.close()
 
 def atualizar_checklist(id, dados):
-    """Atualiza um registro de checklist."""
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
@@ -1200,30 +1131,11 @@ def atualizar_checklist(id, dados):
         conn.close()
 
 def excluir_checklist(id):
-    """Exclui um checklist pelo ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute('DELETE FROM checklists WHERE id = ?', (id,))
         conn.commit()
         return cursor.rowcount > 0
-    finally:
-        conn.close()
-
-def obter_cotacao_por_id(cotacao_id):
-    """Busca uma cotação específica pelo seu ID."""
-    conn = get_db_connection()
-    try:
-        # A consulta junta com users para obter o nome do solicitante
-        query = """
-            SELECT c.*, u.username as solicitante
-            FROM cotacoes c
-            JOIN users u ON c.user_id = u.id
-            WHERE c.id = ?
-        """
-        df = pd.read_sql_query(query, conn, params=(cotacao_id,))
-        if not df.empty:
-            return df.iloc[0].to_dict()
-        return None
     finally:
         conn.close()

@@ -11,10 +11,11 @@
                 <thead class="table-dark">
                     <tr>
                         <th>ID Pedido</th>
-                        <th>Item</th>
-                        <th>Status</th>
+                        <th>Cotação Gênesis</th>
+                        <th>Total de Itens</th>
                         <th>Fornecedor</th>
-                        <th class="text-end">Valor (R$)</th>
+                        <th>Status</th>
+                        <th class="text-end">Valor Total (R$)</th>
                         <th>Data Abertura</th>
                         <th class="text-center">Ações</th>
                     </tr>
@@ -23,15 +24,16 @@
                     {% for pedido in pedidos %}
                     <tr>
                         <td>PC-{{ pedido.id }}</td>
-                        <td>{{ pedido.item }}</td>
+                        <td><a href="{{ url_for('cotacao_detalhe', cotacao_id=pedido.cotacao_id) }}">C-{{ pedido.cotacao_id }}</a></td>
+                        <td>{{ pedido.total_itens }}</td>
+                        <td>{{ pedido.fornecedor_nome or '-' }}</td>
                         <td>
                             <span class="badge {% if pedido.status == 'Finalizado' %}bg-success{% elif pedido.status == 'Aberto' %}bg-info{% else %}bg-warning{% endif %}">
                                 {{ pedido.status }}
                             </span>
                         </td>
-                        <td>{{ pedido.fornecedor_nome or '-' }}</td>
-                        <td class="text-end fw-bold">R$ {{ "%.2f"|format(pedido.valor) }}</td>
-                        <td>{{ pedido.data_abertura }}</td>
+                        <td class="text-end fw-bold">R$ {{ "%.2f"|format(pedido.valor_total) }}</td>
+                        <td>{{ pedido.data_abertura.split(' ')[0] }}</td>
                         <td class="text-center">
                             <a href="{{ url_for('pedido_detalhe', pedido_id=pedido.id) }}" class="btn btn-sm btn-outline-info" title="Ver Detalhes">
                                 <i class="bi bi-eye"></i> Detalhes
@@ -40,7 +42,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center py-4">Nenhum pedido de compra encontrado.</td>
+                        <td colspan="8" class="text-center py-4">Nenhum pedido de compra encontrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

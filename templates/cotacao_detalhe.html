@@ -2,19 +2,33 @@
 
 {% block content %}
 <div class="container-fluid">
+    <a href="{{ url_for('cotacoes_relatorio') }}" class="btn btn-outline-secondary btn-sm mb-3">
+        <i class="bi bi-arrow-left"></i> Voltar para o Relatório
+    </a>
+
     <div class="card mb-4">
         <div class="card-header bg-info text-white">
-            <h5 class="mb-0">Detalhes da Cotação #{{ cotacao.id }}</h5>
+            <h5 class="mb-0">Detalhes da Cotação #{{ cotacao.id }} - {{ cotacao.titulo }}</h5>
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-4"><strong>Item:</strong><p>{{ cotacao.item }}</p></div>
-                <div class="col-md-2"><strong>Quantidade:</strong><p>{{ cotacao.quantidade }}</p></div>
+                <div class="col-md-4"><strong>Solicitante:</strong><p>{{ cotacao.solicitante }}</p></div>
+                <div class="col-md-2"><strong>Data Limite:</strong><p>{{ cotacao.data_limite }}</p></div>
                 <div class="col-md-2"><strong>Status:</strong>
                     <p><span class="badge {% if cotacao.status == 'Aberta' %}bg-warning{% elif cotacao.status == 'Fechada' %}bg-primary{% elif cotacao.status == 'Aprovada' %}bg-success{% else %}bg-danger{% endif %}">{{ cotacao.status }}</span></p>
                 </div>
                 <div class="col-md-4"><strong>Observações:</strong><p>{{ cotacao.observacoes or 'N/A' }}</p></div>
             </div>
+            <hr>
+            <h6>Itens Solicitados</h6>
+            <ul class="list-group">
+                {% for item in itens %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ item.descricao }}
+                    <span class="badge bg-primary rounded-pill">{{ item.quantidade }}</span>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
 
@@ -34,7 +48,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Fornecedor</th>
-                            <th class="text-end">Valor (R$)</th>
+                            <th class="text-end">Valor Total (R$)</th>
                             <th>Prazo de Pagamento</th>
                             <th>Faturamento</th>
                             <th class="text-center">Ações</th>
@@ -52,7 +66,7 @@
                                 <form method="POST" action="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="d-inline">
                                     <input type="hidden" name="action" value="aprovar_orcamento">
                                     <input type="hidden" name="orcamento_id" value="{{ orcamento.id }}">
-                                    <button type="submit" class="btn btn-sm btn-success" title="Aprovar este orçamento">
+                                    <button type="submit" class="btn btn-sm btn-success" title="Aprovar este orçamento" onclick="return confirm('Tem certeza que deseja aprovar este orçamento e gerar um Pedido de Compra?')">
                                         <i class="bi bi-check-lg"></i> Aprovar
                                     </button>
                                 </form>
@@ -92,7 +106,7 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Valor (R$) *</label>
+                        <label class="form-label">Valor Total do Orçamento (R$) *</label>
                         <input type="number" step="0.01" min="0.01" class="form-control" name="valor" required>
                     </div>
                     <div class="mb-3">

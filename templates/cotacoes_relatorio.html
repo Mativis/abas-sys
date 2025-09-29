@@ -14,10 +14,12 @@
                 <thead class="table-dark">
                     <tr>
                         <th>ID</th>
-                        <th>Item</th>
+                        <th>Título da Cotação</th>
+                        <th>Total de Itens</th>
                         <th>Solicitante</th>
                         <th>Data Limite</th>
                         <th>Status</th>
+                        <th class="text-end">Valor Aprovado</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
@@ -25,13 +27,21 @@
                     {% for cotacao in cotacoes %}
                     <tr>
                         <td>C-{{ cotacao.id }}</td>
-                        <td>{{ cotacao.item }}</td>
+                        <td>{{ cotacao.titulo }}</td>
+                        <td>{{ cotacao.total_itens }}</td>
                         <td><span class="badge bg-secondary">{{ cotacao.solicitante }}</span></td>
                         <td>{{ cotacao.data_limite }}</td>
                         <td>
                             <span class="badge {% if cotacao.status == 'Aberta' %}bg-warning{% elif cotacao.status == 'Fechada' %}bg-primary{% elif cotacao.status == 'Aprovada' %}bg-success{% else %}bg-danger{% endif %}">
                                 {{ cotacao.status }}
                             </span>
+                        </td>
+                        <td class="text-end fw-bold">
+                            {% if cotacao.valor_aprovado %}
+                                R$ {{ "%.2f"|format(cotacao.valor_aprovado) }}
+                            {% else %}
+                                -
+                            {% endif %}
                         </td>
                         <td class="text-center">
                             <a href="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="btn btn-sm btn-outline-info" title="Ver Detalhes e Orçamentos">
@@ -41,7 +51,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center py-4">Nenhuma cotação cadastrada.</td>
+                        <td colspan="8" class="text-center py-4">Nenhuma cotação cadastrada.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -51,28 +61,43 @@
 </div>
 
 <div class="modal fade" id="novaCotacaoModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Solicitar Nova Cotação</h5>
+                <h5 class="modal-title">Criar Nova Cotação</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('cotacoes_relatorio') }}">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Item *</label>
-                        <input type="text" class="form-control" name="item" required>
+                        <label class="form-label">Título da Cotação *</label>
+                        <input type="text" class="form-control" name="titulo" required placeholder="Ex: Peças para manutenção da Máquina X">
                     </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Quantidade *</label>
-                            <input type="number" step="0.01" min="0.01" class="form-control" name="quantidade" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Data Limite de Necessidade *</label>
-                            <input type="date" class="form-control" name="data_limite" required>
+                    <div class="mb-3">
+                        <label class="form-label">Data Limite de Necessidade *</label>
+                        <input type="date" class="form-control" name="data_limite" required>
+                    </div>
+                    <hr>
+                    <h6>Itens da Cotação</h6>
+                    <div id="itens-container">
+                        <div class="row g-2 mb-2 item-row">
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" name="item_descricao[]" placeholder="Descrição do item" required>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" class="form-control" name="item_quantidade[]" placeholder="Qtd" step="0.01" required>
+                            </div>
+                            <div class="col-md-1">
+                                <button type="button" class="btn btn-danger btn-sm w-100" onclick="removerItem(this)" disabled>
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="adicionarItem()">
+                        <i class="bi bi-plus"></i> Adicionar outro item
+                    </button>
+                    <hr>
                     <div class="mb-3 mt-3">
                         <label class="form-label">Observações</label>
                         <textarea class="form-control" name="observacoes" rows="3"></textarea>
@@ -80,10 +105,39 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Criar e Ver Detalhes</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Criar Cotação</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    function adicionarItem() {
+        const container = document.getElementById('itens-container');
+        const novoItem = container.children[0].cloneNode(true);
+        novoItem.querySelectorAll('input').forEach(input => input.value = '');
+        novoItem.querySelector('button').disabled = false; // Habilita o botão de remover para o novo item
+        container.appendChild(novoItem);
+        // Habilita todos os botões de remover se houver mais de um item
+        atualizarBotoesRemover();
+    }
+
+    function removerItem(button) {
+        button.closest('.item-row').remove();
+        atualizarBotoesRemover();
+    }
+    
+    function atualizarBotoesRemover() {
+        const container = document.getElementById('itens-container');
+        const rows = container.getElementsByClassName('item-row');
+        if (rows.length === 1) {
+            rows[0].querySelector('button').disabled = true;
+        } else {
+            for (let row of rows) {
+                row.querySelector('button').disabled = false;
+            }
+        }
+    }
+</script>
 {% endblock %}
