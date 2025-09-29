@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-people me-2"></i> Gerenciamento de Usuários
+        </div>
+        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novoUsuarioModal" onclick="resetForm('formNovoUsuario')">
+            <i class="bi bi-plus-circle me-1"></i> Novo Usuário
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <strong>Atenção:</strong> Apenas o papel "Gestor" possui acesso a esta página. O papel "Administrador" foi padronizado como "Gestor" no sistema.
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome de Usuário</th>
+                        <th>Função (Role)</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr id="user-row-{{ user.id }}">
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if user.role == 'Gestor' %}bg-danger
+                                {% elif user.role == 'Comprador' %}bg-primary
+                                {% else %}bg-secondary{% endif %}">
+                                {{ user.role }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" 
+                                        onclick="abrirModalEdicao({{ user.id }}, '{{ user.username }}', '{{ user.role }}')"
+                                        data-bs-toggle="tooltip" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% if user.id != g.user.id %}
+                                <button class="btn btn-outline-danger" 
+                                        onclick="deletarUsuario({{ user.id }}, '{{ user.username }}')"
+                                        data-bs-toggle="tooltip" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-outline-danger" disabled title="Não é possível excluir seu próprio usuário">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="novoUsuarioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Usuário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNovoUsuario">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome de Usuário *</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Senha * (Mínimo 3 caracteres)</label>
+                        <input type="password" class="form-control" name="password" required minlength="3">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Função (Role) *</label>
+                        <select class="form-select" name="role" required>
+                            {% for role in roles %}
+                                <option value="{{ role }}">{{ role }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarNovoUsuario()">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editarUsuarioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Usuário: <span id="editar_username_title"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditarUsuario">
+                <input type="hidden" id="editar_user_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome de Usuário *</label>
+                        <input type="text" class="form-control" name="username" id="editar_username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nova Senha (Deixe em branco para manter a atual)</label>
+                        <input type="password" class="form-control" name="password" id="editar_password" minlength="3">
+                        <small class="text-muted">A senha deve ter no mínimo 3 caracteres.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Função (Role) *</label>
+                        <select class="form-select" name="role" id="editar_role" required>
+                            {% for role in roles %}
+                                <option value="{{ role }}">{{ role }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.style.minWidth = '300px';
+        alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        
+        document.body.appendChild(alertDiv);
+        setTimeout(() => { if (alertDiv.parentNode) alertDiv.parentNode.removeChild(alertDiv); }, 5000);
+    }
+
+    function resetForm(formId) {
+        document.getElementById(formId).reset();
+    }
+
+    // --- CRUD API CALLS ---
+
+    function salvarNovoUsuario() {
+        const form = document.getElementById('formNovoUsuario');
+        const data = {
+            username: form.elements['username'].value,
+            password: form.elements['password'].value,
+            role: form.elements['role'].value
+        };
+
+        fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('novoUsuarioModal')).hide();
+                showAlert('Usuário criado com sucesso!', 'success');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                showAlert('Erro ao criar usuário: ' + (result.error || 'Verifique os dados.'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+
+    function abrirModalEdicao(id, username, role) {
+        document.getElementById('editar_user_id').value = id;
+        document.getElementById('editar_username_title').textContent = username;
+        document.getElementById('editar_username').value = username;
+        document.getElementById('editar_role').value = role;
+        document.getElementById('editar_password').value = ''; 
+        new bootstrap.Modal(document.getElementById('editarUsuarioModal')).show();
+    }
+
+    function salvarEdicaoUsuario() {
+        const id = document.getElementById('editar_user_id').value;
+        const form = document.getElementById('formEditarUsuario');
+        
+        const data = {
+            username: form.elements['username'].value,
+            role: form.elements['role'].value,
+            password: form.elements['password'].value || null // Envia null se vazio
+        };
+
+        fetch(`/api/users/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editarUsuarioModal')).hide();
+                showAlert('Usuário atualizado com sucesso!', 'success');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                showAlert('Erro ao atualizar usuário: ' + (result.error || 'Verifique os dados.'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+
+    function deletarUsuario(id, username) {
+        if (!confirm(`Tem certeza que deseja excluir o usuário ${username}? Esta ação é irreversível.`)) {
+            return;
+        }
+
+        fetch(`/api/users/${id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showAlert(`Usuário ${username} excluído com sucesso!`, 'success');
+                document.getElementById(`user-row-${id}`).remove();
+                setTimeout(() => location.reload(), 500);
+            } else {
+                showAlert('Erro ao excluir usuário: ' + (result.error || 'Verifique se você está tentando excluir seu próprio usuário.'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+</script>
+{% endblock %}

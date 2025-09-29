@@ -22,17 +22,17 @@ def criar_tabelas():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Tabela de usuários (NOVA)
+    # Tabela de usuários (ATUALIZADA com 'Administrador')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('Gestor', 'Comprador', 'Padrão'))
+        role TEXT NOT NULL CHECK(role IN ('Administrador', 'Gestor', 'Comprador', 'Padrão'))
     )
     ''')
 
-    # Tabela de fornecedores (NOVA)
+    # Tabela de fornecedores
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS fornecedores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +46,7 @@ def criar_tabelas():
     )
     ''')
 
-    # Tabela de cotações (NOVA)
+    # Tabela de cotações
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS cotacoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,17 +67,17 @@ def criar_tabelas():
     )
     ''')
 
-    # Tabela de pedidos de compra (NOVA)
+    # Tabela de pedidos de compra
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS pedidos_compra (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         quote_id INTEGER,
-        user_id INTEGER NOT NULL, -- ID do usuário que finalizou a compra/aprovou a cotação
+        user_id INTEGER NOT NULL,
         item TEXT NOT NULL,
         quantidade REAL NOT NULL,
         valor REAL NOT NULL,
         fornecedor_cnpj TEXT,
-        status TEXT DEFAULT 'Aberto', -- Aberto, Em Edição, Finalizado, Cancelado
+        status TEXT DEFAULT 'Aberto',
         nf_e_chave TEXT,
         nfs_pdf_path TEXT,
         data_abertura TEXT NOT NULL,
@@ -184,6 +184,7 @@ def criar_tabelas():
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
         users_iniciais = [
+            ('admin', generate_password_hash('123'), 'Administrador'), # NOVO ADMINISTRADOR
             ('gestor', generate_password_hash('123'), 'Gestor'),
             ('comprador', generate_password_hash('123'), 'Comprador'),
             ('padrao', generate_password_hash('123'), 'Padrão')
@@ -214,7 +215,7 @@ def criar_tabelas():
     conn.commit()
     conn.close()
 
-# --- Funções de Usuário (NOVO) ---
+# --- Funções de Usuário (CORRIGIDAS para a nova role) ---
 def get_user_by_username(username):
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
@@ -227,7 +228,68 @@ def get_user_by_id(user_id):
     conn.close()
     return user
 
-# --- Funções de Fornecedor (NOVO) ---
+def get_all_users():
+    """Retorna todos os usuários (id, username, role)."""
+    conn = get_db_connection()
+    df = pd.read_sql("SELECT id, username, role FROM users ORDER BY role, username", conn)
+    conn.close()
+    return df.to_dict('records')
+
+def create_user(username, password, role):
+    """Cria um novo usuário."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        password_hash = generate_password_hash(password)
+        # Verifica se a role é válida
+        if role not in ['Administrador', 'Gestor', 'Comprador', 'Padrão']:
+            raise ValueError("Role inválida.")
+        cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", (username, password_hash, role))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False # Username already exists
+    except ValueError:
+        return False
+    finally:
+        conn.close()
+
+def update_user(user_id, username, role, password=None):
+    """Atualiza dados de um usuário (incluindo senha opcionalmente)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Verifica se a role é válida
+        if role not in ['Administrador', 'Gestor', 'Comprador', 'Padrão']:
+            raise ValueError("Role inválida.")
+        
+        if password and len(password) >= 3:
+            password_hash = generate_password_hash(password)
+            cursor.execute("UPDATE users SET username = ?, role = ?, password_hash = ? WHERE id = ?", (username, role, password_hash, user_id))
+        else:
+            cursor.execute("UPDATE users SET username = ?, role = ? WHERE id = ?", (username, role, user_id))
+            
+        conn.commit()
+        return cursor.rowcount > 0
+    except sqlite3.IntegrityError:
+        return False # Username conflict
+    except ValueError:
+        return False
+    finally:
+        conn.close()
+
+def delete_user(user_id):
+    """Exclui um usuário pelo ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+# --- Funções de Fornecedor ---
 def criar_fornecedor(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -249,7 +311,7 @@ def obter_fornecedores():
     conn.close()
     return df.to_dict('records')
 
-# --- Funções de Cotação (NOVO) ---
+# --- Funções de Cotação ---
 def criar_cotacao(user_id, dados):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1072,5 +1134,3 @@ def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimet
         return False
     finally:
         conn.close()
-
-# Fim das Funções (Corrigidas)

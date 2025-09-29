@@ -21,7 +21,7 @@ from database import (
     atualizar_preco_combustivel,
     criar_combustivel,
     obter_opcoes_filtro,
-    excluir_registro, # Função que estava causando o erro de importação
+    excluir_registro,
     atualizar_registro,
     criar_registro,
     obter_registro_por_id,
@@ -43,10 +43,14 @@ from database import (
     obter_pedagio_por_id,
     atualizar_pedagio,
     excluir_pedagio,
-    obter_checklists, # Função de checklist (listagem)
+    obter_checklists,
     # NOVAS FUNÇÕES DEALERS
     get_user_by_username,
     get_user_by_id,
+    get_all_users, # Adicionado para user_management
+    create_user, # Adicionado para user_management
+    update_user, # Adicionado para user_management
+    delete_user, # Adicionado para user_management
     obter_fornecedores,
     criar_fornecedor,
     obter_cotacoes,
@@ -94,6 +98,11 @@ def roles_required(roles):
             if g.user is None:
                 flash('Você precisa estar logado para acessar esta página.', 'warning')
                 return redirect(url_for('login'))
+                
+            # LÓGICA DE SUPER-ROLE: Concede acesso total ao Administrador
+            if g.user['role'] == 'Administrador':
+                return view(*args, **kwargs)
+                
             if g.user['role'] not in roles:
                 flash('Acesso negado. Sua função não permite acessar esta página.', 'danger')
                 return redirect(url_for('index'))
@@ -222,7 +231,6 @@ def manutencoes():
 @login_required
 def checklists():
     try:
-        from database import obter_checklists
         checklists_list = obter_checklists()
         return render_template('checklists.html', active_page='checklists', checklists=checklists_list)
     except Exception as e:
@@ -236,7 +244,7 @@ def medias_veiculos():
         dados = calcular_medias_veiculos()
         df = pd.DataFrame(dados)
         if not df.empty:
-            # Recomenda-se gerar o gráfico usando JS no template em produção, mas mantido o código original aqui.
+            # Mantido sem gerar gráfico aqui, assumindo que o template faz isso via JS.
             pass
         return render_template('medias_veiculos.html', dados=dados, active_page='medias')
     except Exception as e:
@@ -291,7 +299,7 @@ def metricas_uso():
 
 @app.route('/reajuste-combustiveis', methods=['GET', 'POST'])
 @login_required
-@roles_required(['Gestor'])
+@roles_required(['Administrador', 'Gestor'])
 def reajuste_combustiveis():
     if request.method == 'POST':
         try:
@@ -343,9 +351,10 @@ def pedagios():
     return render_template('pedagios.html', active_page='pedagios', pedagios=pedagios_list, filtros=filtros, placas_disponiveis=placas_disponiveis)
 
 # --- Rotas do Módulo Dealers (NOVAS) ---
+
 @app.route('/dealers/fornecedores', methods=['GET', 'POST'])
 @login_required
-@roles_required(['Gestor', 'Comprador'])
+@roles_required(['Administrador', 'Gestor', 'Comprador'])
 def fornecedores():
     if request.method == 'POST':
         try:
@@ -385,7 +394,7 @@ def cotacoes():
                 else:
                     flash('Erro ao criar cotação.', 'danger')
             
-            elif action == 'fechar' and user_role == 'Comprador':
+            elif action == 'fechar' and user_role in ['Administrador', 'Comprador']:
                 dados = {'fornecedor_id': request.form.get('fornecedor_id'), 'valor_fechado': request.form['valor_fechado'], 'prazo_pagamento': request.form['prazo_pagamento'], 'faturamento': request.form['faturamento']}
                 success, fornecedor_cnpj = fechar_cotacao(cotacao_id, dados)
                 if success:
@@ -393,7 +402,7 @@ def cotacoes():
                 else:
                     flash('Erro ao fechar cotação. Verifique o status.', 'danger')
 
-            elif action == 'aprovar' and user_role == 'Gestor':
+            elif action == 'aprovar' and user_role in ['Administrador', 'Gestor']:
                 if aprovar_cotacao(cotacao_id, session['user_id']):
                     flash('Cotação aprovada! Pedido de Compra gerado.', 'success')
                 else:
@@ -410,7 +419,7 @@ def cotacoes():
 
 @app.route('/dealers/pedidos-compra', methods=['GET', 'POST'])
 @login_required
-@roles_required(['Gestor', 'Comprador'])
+@roles_required(['Administrador', 'Gestor', 'Comprador'])
 def pedidos_compra():
     user_role = session.get('role')
     
@@ -419,14 +428,14 @@ def pedidos_compra():
         action = request.form.get('action')
         
         try:
-            if action == 'editar' and user_role == 'Comprador':
+            if action == 'editar' and user_role in ['Administrador', 'Comprador']:
                 dados = {'item': request.form['item'], 'quantidade': request.form['quantidade'], 'valor': request.form['valor'], 'status': request.form['status']}
                 if atualizar_pedido_compra(pedido_id, dados):
                     flash('Pedido de Compra atualizado com sucesso!', 'success')
                 else:
                     flash('Erro ao atualizar Pedido de Compra.', 'danger')
 
-            elif action == 'finalizar' and user_role == 'Comprador':
+            elif action == 'finalizar' and user_role in ['Administrador', 'Comprador']:
                 chave_nfe = request.form.get('nf_e_chave').strip()
                 nfs_file = request.files.get('nfs_pdf')
                 
@@ -463,7 +472,7 @@ def pedidos_compra():
 
 @app.route('/dealers/dealer-intelligence', methods=['GET', 'POST'])
 @login_required
-@roles_required(['Gestor'])
+@roles_required(['Administrador', 'Gestor'])
 def dealer_intelligence():
     data_fim = request.form.get('data_fim', datetime.now().strftime('%Y-%m-%d'))
     data_inicio = request.form.get('data_inicio', (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d'))
@@ -475,8 +484,69 @@ def dealer_intelligence():
                            data=data,
                            filtros={'data_inicio': data_inicio, 'data_fim': data_fim})
 
-# --- APIs Existentes (Atualizadas com @login_required) ---
+@app.route('/admin/users', methods=['GET'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def user_management():
+    users = get_all_users()
+    roles = ['Administrador', 'Gestor', 'Comprador', 'Padrão']
+    return render_template('user_management.html', active_page='user_management', users=users, roles=roles)
 
+# --- APIs de Gerenciamento de Usuários (NOVAS) ---
+@app.route('/api/users', methods=['POST'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def api_create_user():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+    
+    if not all([username, password, role]):
+        return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
+    
+    if len(password) < 3:
+        return jsonify({'success': False, 'error': 'A senha deve ter pelo menos 3 caracteres.'}), 400
+    
+    if create_user(username, password, role):
+        return jsonify({'success': True}), 201
+    else:
+        return jsonify({'success': False, 'error': 'Nome de usuário já existe ou role inválida.'}), 409
+
+@app.route('/api/users/<int:user_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def api_manage_user(user_id):
+    if request.method == 'GET':
+        user = get_user_by_id(user_id)
+        if user:
+            return jsonify({'id': user['id'], 'username': user['username'], 'role': user['role']})
+        return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+        
+    elif request.method == 'PUT':
+        data = request.get_json()
+        username = data.get('username')
+        role = data.get('role')
+        password = data.get('password')
+        
+        if not all([username, role]):
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
+        
+        if update_user(user_id, username, role, password):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Erro ao atualizar. Nome de usuário pode estar em uso ou role inválida.'}), 409
+            
+    elif request.method == 'DELETE':
+        if user_id == g.user['id']:
+             return jsonify({'success': False, 'error': 'Não é permitido deletar seu próprio usuário.'}), 403
+             
+        if delete_user(user_id):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+
+# --- APIs Remanescentes (Mantidas) ---
 @app.route('/api/dashboard')
 @login_required
 def api_dashboard():
@@ -528,7 +598,7 @@ def api_manutencoes():
 
 @app.route('/api/manutencoes/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @login_required
-@roles_required(['Gestor', 'Comprador'])
+@roles_required(['Administrador', 'Gestor', 'Comprador'])
 def api_manutencao(id):
     if request.method == 'GET':
         try:
@@ -555,7 +625,6 @@ def api_manutencao(id):
 def api_checklists():
     if request.method == 'GET':
         try:
-            from database import obter_checklists
             checklists_list = obter_checklists()
             return jsonify({'checklists': checklists_list})
         except Exception as e:
@@ -623,12 +692,12 @@ def api_excluir_troca_oleo(identificacao, tipo):
 
 @app.route('/api/registros', methods=['POST'])
 @login_required
-@roles_required(['Gestor', 'Comprador', 'Padrão'])
-def criar_registro_api():
+@roles_required(['Administrador', 'Gestor', 'Comprador', 'Padrão'])
+def api_criar_registro():
     try:
         dados = request.get_json()
         if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel'), dados.get('litros'), dados.get('custo_por_litro')]):
-            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
         
         litros = float(dados['litros'])
         custo_por_litro = float(dados['custo_por_litro'])
@@ -646,7 +715,7 @@ def criar_registro_api():
 
 @app.route('/api/registros/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @login_required
-@roles_required(['Gestor', 'Comprador', 'Padrão'])
+@roles_required(['Administrador', 'Gestor', 'Comprador', 'Padrão'])
 def gerenciar_registro(id):
     if request.method == 'GET':
         try:
@@ -659,7 +728,7 @@ def gerenciar_registro(id):
         try:
             dados = request.get_json()
             if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel'), dados.get('litros'), dados.get('custo_por_litro')]):
-                return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+                return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
             
             litros = float(dados['litros'])
             custo_por_litro = float(dados['custo_por_litro'])
@@ -686,7 +755,7 @@ def api_criar_pedagio():
     try:
         dados = request.get_json()
         if not all([dados.get('data'), dados.get('placa'), dados.get('valor')]):
-            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando'}), 400
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
         
         pedagio_id = criar_pedagio(dados)
         if pedagio_id: return jsonify({'success': True, 'id': pedagio_id})
@@ -727,11 +796,73 @@ def medias_veiculos_dados():
 
 @app.route('/api/pedidos-compra/<int:id>', methods=['GET'])
 @login_required
-@roles_required(['Gestor', 'Comprador'])
+@roles_required(['Administrador', 'Gestor', 'Comprador'])
 def api_pedido_compra(id):
     pedido = obter_pedido_compra_por_id(id)
     if pedido: return jsonify(pedido)
     return jsonify({'error': 'Pedido não encontrado'}), 404
+
+# --- Rotas de Gerenciamento de Usuários ---
+@app.route('/admin/users', methods=['GET'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def user_management():
+    users = get_all_users()
+    roles = ['Administrador', 'Gestor', 'Comprador', 'Padrão']
+    return render_template('user_management.html', active_page='user_management', users=users, roles=roles)
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def api_create_user():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+    
+    if not all([username, password, role]):
+        return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
+    
+    if len(password) < 3:
+        return jsonify({'success': False, 'error': 'A senha deve ter pelo menos 3 caracteres.'}), 400
+    
+    if create_user(username, password, role):
+        return jsonify({'success': True}), 201
+    else:
+        return jsonify({'success': False, 'error': 'Nome de usuário já existe ou role inválida.'}), 409
+
+@app.route('/api/users/<int:user_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def api_manage_user(user_id):
+    if request.method == 'GET':
+        user = get_user_by_id(user_id)
+        if user:
+            return jsonify({'id': user['id'], 'username': user['username'], 'role': user['role']})
+        return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+        
+    elif request.method == 'PUT':
+        data = request.get_json()
+        username = data.get('username')
+        role = data.get('role')
+        password = data.get('password')
+        
+        if not all([username, role]):
+            return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
+        
+        if update_user(user_id, username, role, password):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Erro ao atualizar. Nome de usuário pode estar em uso ou role inválida.'}), 409
+            
+    elif request.method == 'DELETE':
+        if user_id == g.user['id']:
+             return jsonify({'success': False, 'error': 'Não é permitido deletar seu próprio usuário.'}), 403
+             
+        if delete_user(user_id):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
 
 # --- Context Processor e Main ---
 @app.route('/static/<path:filename>')

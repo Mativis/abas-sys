@@ -337,7 +337,7 @@
                                 <a class="dropdown-item {{ 'active' if active_page == 'medias' }}" href="{{ url_for('medias_veiculos') }}">
                                     <i class="bi bi-speedometer2 me-2"></i> Média
                                 </a>
-                                {% if g.user.role == 'Gestor' %}
+                                {% if g.user.role in ['Administrador', 'Gestor'] %}
                                 <a class="dropdown-item {{ 'active' if active_page == 'combustiveis' }}" href="{{ url_for('reajuste_combustiveis') }}">
                                     <i class="bi bi-droplet me-2"></i> Combustíveis
                                 </a>
@@ -363,10 +363,19 @@
                                     <i class="bi bi-clipboard-check me-2"></i> Checklist
                                 </a>
                             </li>
+                            {% if g.user.role in ['Administrador', 'Gestor'] %}
+                            <li class="dropdown-divider"></li>
+                            <li class="nav-group-title">Administração</li>
+                            <li class="nav-group">
+                                <a class="dropdown-item {{ 'active' if active_page == 'user_management' }}" href="{{ url_for('user_management') }}">
+                                    <i class="bi bi-people me-2"></i> Gerenciar Usuários
+                                </a>
+                            </li>
+                            {% endif %}
                         </ul>
                     </li>
 
-                    {% if g.user.role in ['Gestor', 'Comprador', 'Padrão'] %}
+                    {% if g.user.role in ['Administrador', 'Gestor', 'Comprador', 'Padrão'] %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ 'active' if active_group == 'dealers' }}" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-shop me-1"></i> Dealers
@@ -374,7 +383,7 @@
                         <ul class="dropdown-menu">
                             <li class="nav-group-title">Dealers - Compras</li>
                             <li class="nav-group">
-                                {% if g.user.role in ['Gestor', 'Comprador'] %}
+                                {% if g.user.role in ['Administrador', 'Gestor', 'Comprador'] %}
                                 <a class="dropdown-item {{ 'active' if active_page == 'pedidos_compra' }}" href="{{ url_for('pedidos_compra') }}">
                                     <i class="bi bi-list-task me-2"></i> Pedidos de Compra
                                 </a>
@@ -386,7 +395,7 @@
                                 </a>
                                 {% endif %}
                             </li>
-                            {% if g.user.role == 'Gestor' %}
+                            {% if g.user.role in ['Administrador', 'Gestor'] %}
                             <li class="dropdown-divider"></li>
                             <a class="dropdown-item {{ 'active' if active_page == 'dealer_intelligence' }}" href="{{ url_for('dealer_intelligence') }}">
                                 <i class="bi bi-graph-up me-2"></i> Dealer Intelligence
@@ -439,8 +448,26 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Sistema de preservação de filtros (omitido para brevidade, mas deve ser mantido)
-        
+        function getFormData(formId) {
+            const form = document.getElementById(formId);
+            if (!form) return {};
+            
+            const formData = new FormData(form);
+            const data = {};
+            
+            for (const [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            form.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(input => {
+                if (input.checked) {
+                    data[input.name] = input.value;
+                }
+            });
+            
+            return data;
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             const tooltipList = tooltipTriggerList.map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
