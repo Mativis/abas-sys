@@ -14,39 +14,15 @@ ATENCAO_HORAS = 50
 def get_db_connection():
     """Retorna uma conexão com o banco de dados com row_factory ativado."""
     conn = sqlite3.connect('abastecimentos.db')
-    conn.row_factory = sqlite3.Row  # Permite acessar colunas por nome
+    conn.row_factory = sqlite3.Row
     return conn
 
 def criar_tabelas():
-    """Cria todas as tabelas necessárias no banco de dados e insere usuários padrão."""
+    """Cria todas as tabelas necessárias no banco de dados."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Tabela de usuários (ATUALIZADA com 'Administrador')
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('Administrador', 'Gestor', 'Comprador', 'Padrão'))
-    )
-    ''')
 
-    # Tabela de fornecedores
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS fornecedores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cnpj TEXT NOT NULL UNIQUE,
-        nome TEXT NOT NULL,
-        ie TEXT,
-        endereco TEXT,
-        tipo TEXT,
-        contato TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-
-    # Tabela de cotações
+    # Tabela de cotações (SIMPLIFICADA)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS cotacoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,23 +31,34 @@ def criar_tabelas():
         quantidade REAL NOT NULL,
         data_limite TEXT NOT NULL,
         observacoes TEXT,
-        fornecedor_id INTEGER,
-        valor_fechado REAL,
-        prazo_pagamento TEXT,
-        faturamento TEXT,
-        status TEXT DEFAULT 'Aberta', -- Aberta, Fechada, Aprovada, Rejeitada
+        status TEXT DEFAULT 'Aberta', -- Aberta, Fechada, Aprovada, Rejeitada, Cancelada
         data_aprovacao TEXT,
         data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+
+    # NOVA Tabela de Orçamentos
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS orcamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cotacao_id INTEGER NOT NULL,
+        fornecedor_id INTEGER NOT NULL,
+        valor REAL NOT NULL,
+        prazo_pagamento TEXT,
+        faturamento TEXT,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
+        aprovado BOOLEAN DEFAULT 0,
+        FOREIGN KEY (cotacao_id) REFERENCES cotacoes (id),
         FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
     )
     ''')
 
-    # Tabela de pedidos de compra
+    # Tabela de pedidos de compra (ATUALIZADA com orcamento_id)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS pedidos_compra (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        quote_id INTEGER,
+        orcamento_id INTEGER,
         user_id INTEGER NOT NULL,
         item TEXT NOT NULL,
         quantidade REAL NOT NULL,
@@ -84,118 +71,90 @@ def criar_tabelas():
         data_finalizacao TEXT,
         data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (quote_id) REFERENCES cotacoes (id)
-    )
-    ''')
-    
-    # Tabela de abastecimentos
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS abastecimentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data TEXT NOT NULL,
-        placa TEXT NOT NULL,
-        responsavel TEXT,
-        litros REAL NOT NULL,
-        desconto REAL DEFAULT 0,
-        odometro REAL,
-        centro_custo TEXT,
-        combustivel TEXT,
-        custo_por_litro REAL NOT NULL,
-        custo_bruto REAL NOT NULL,
-        custo_liquido REAL NOT NULL,
-        km_rodados REAL,
-        km_litro REAL,
-        posto TEXT,
-        integracao_atheris BOOLEAN DEFAULT 0,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-    
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS pedagios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data TEXT NOT NULL,
-        placa TEXT NOT NULL,
-        valor REAL NOT NULL,
-        observacoes TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+        FOREIGN KEY (orcamento_id) REFERENCES orcamentos (id)
     )
     ''')
 
+    # Demais tabelas permanecem iguais...
+    # (O código das outras tabelas foi omitido para brevidade, mas deve ser mantido como estava)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('Administrador', 'Gestor', 'Comprador', 'Padrão'))
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS fornecedores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cnpj TEXT NOT NULL UNIQUE,
+        nome TEXT NOT NULL,
+        ie TEXT,
+        endereco TEXT,
+        tipo TEXT,
+        contato TEXT,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS abastecimentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, placa TEXT NOT NULL, responsavel TEXT,
+        litros REAL NOT NULL, desconto REAL DEFAULT 0, odometro REAL, centro_custo TEXT, combustivel TEXT,
+        custo_por_litro REAL NOT NULL, custo_bruto REAL NOT NULL, custo_liquido REAL NOT NULL,
+        km_rodados REAL, km_litro REAL, posto TEXT, integracao_atheris BOOLEAN DEFAULT 0,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pedagios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, placa TEXT NOT NULL, valor REAL NOT NULL,
+        observacoes TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS precos_combustivel (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        combustivel TEXT NOT NULL UNIQUE,
-        preco REAL NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT, combustivel TEXT NOT NULL UNIQUE, preco REAL NOT NULL,
         data_atualizacao TEXT NOT NULL
     )
     ''')
-    
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS trocas_oleo (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        identificacao TEXT NOT NULL,
-        tipo TEXT CHECK(tipo IN ('veiculo', 'maquina')) NOT NULL,
-        data_troca TEXT NOT NULL,
-        km_troca REAL,
-        horimetro_troca REAL,
-        proxima_troca_km REAL,
-        proxima_troca_horimetro REAL,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(identificacao, tipo)
+        id INTEGER PRIMARY KEY AUTOINCREMENT, identificacao TEXT NOT NULL,
+        tipo TEXT CHECK(tipo IN ('veiculo', 'maquina')) NOT NULL, data_troca TEXT NOT NULL,
+        km_troca REAL, horimetro_troca REAL, proxima_troca_km REAL, proxima_troca_horimetro REAL,
+        data_registro TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(identificacao, tipo)
     )
     ''')
-    
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS checklists (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        identificacao TEXT NOT NULL,
-        data TEXT NOT NULL,
-        horimetro REAL,
-        nivel_oleo TEXT CHECK(nivel_oleo IN ('ADEQUADO', 'BAIXO', 'CRÍTICO')) DEFAULT 'ADEQUADO',
-        observacoes TEXT,
-        itens_checklist TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT, identificacao TEXT NOT NULL, data TEXT NOT NULL,
+        horimetro REAL, nivel_oleo TEXT CHECK(nivel_oleo IN ('ADEQUADO', 'BAIXO', 'CRÍTICO')) DEFAULT 'ADEQUADO',
+        observacoes TEXT, itens_checklist TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
     )
     ''')
-    
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS manutencoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        identificacao TEXT NOT NULL,
-        tipo TEXT NOT NULL,
-        frota TEXT NOT NULL,
-        descricao TEXT NOT NULL,
-        fornecedor TEXT,
-        valor REAL DEFAULT 0,
-        data_abertura TEXT NOT NULL,
-        previsao_conclusao TEXT,
-        data_conclusao TEXT,
-        observacoes TEXT,
-        finalizada BOOLEAN DEFAULT 0,
-        prazo_liberacao INTEGER,
-        forma_pagamento TEXT,
-        parcelas INTEGER DEFAULT 1,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT, identificacao TEXT NOT NULL, tipo TEXT NOT NULL,
+        frota TEXT NOT NULL, descricao TEXT NOT NULL, fornecedor TEXT, valor REAL DEFAULT 0,
+        data_abertura TEXT NOT NULL, previsao_conclusao TEXT, data_conclusao TEXT,
+        observacoes TEXT, finalizada BOOLEAN DEFAULT 0, prazo_liberacao INTEGER,
+        forma_pagamento TEXT, parcelas INTEGER DEFAULT 1, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
     )
     ''')
-    
-    # Inserir Usuários de Exemplo
+
+
+    # Adicionar usuários e preços padrão (se não existirem)
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
         users_iniciais = [
-            ('admin', generate_password_hash('123'), 'Administrador'), # NOVO ADMINISTRADOR
+            ('admin', generate_password_hash('123'), 'Administrador'),
             ('gestor', generate_password_hash('123'), 'Gestor'),
             ('comprador', generate_password_hash('123'), 'Comprador'),
             ('padrao', generate_password_hash('123'), 'Padrão')
         ]
-        
-        cursor.executemany('''
-        INSERT INTO users (username, password_hash, role)
-        VALUES (?, ?, ?)
-        ''', users_iniciais)
+        cursor.executemany('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', users_iniciais)
 
-    # Inserir preços iniciais de combustível (mantido do original)
     cursor.execute("SELECT COUNT(*) FROM precos_combustivel")
     if cursor.fetchone()[0] == 0:
         precos_iniciais = [
@@ -205,17 +164,169 @@ def criar_tabelas():
             ('DESSEL S500', 4.750, datetime.now().strftime('%Y-%m-%d')),
             ('ARLA', 2.990, datetime.now().strftime('%Y-%m-%d'))
         ]
-        
-        cursor.executemany('''
-        INSERT INTO precos_combustivel (combustivel, preco, data_atualizacao)
-        VALUES (?, ?, ?)
-        ''', precos_iniciais)
+        cursor.executemany('INSERT INTO precos_combustivel (combustivel, preco, data_atualizacao) VALUES (?, ?, ?)', precos_iniciais)
 
 
     conn.commit()
     conn.close()
 
-# --- Funções de Usuário (CORRIGIDAS para a nova role) ---
+
+# --- Funções de Cotação (Atualizadas) ---
+
+def obter_cotacoes():
+    conn = get_db_connection()
+    # A consulta principal agora busca o orçamento aprovado para exibir na lista principal
+    query = '''
+        SELECT
+            c.id, c.item, c.quantidade, c.data_limite, c.status,
+            u.username as solicitante,
+            f.nome as fornecedor_nome,
+            o.valor as valor_fechado
+        FROM cotacoes c
+        JOIN users u ON c.user_id = u.id
+        LEFT JOIN orcamentos o ON c.id = o.cotacao_id AND o.aprovado = 1
+        LEFT JOIN fornecedores f ON o.fornecedor_id = f.id
+        ORDER BY c.data_registro DESC
+    '''
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df.to_dict('records')
+
+def adicionar_orcamento(dados):
+    """Adiciona uma nova proposta de orçamento a uma cotação existente."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO orcamentos (cotacao_id, fornecedor_id, valor, prazo_pagamento, faturamento)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            dados['cotacao_id'], dados['fornecedor_id'],
+            float(dados['valor']), dados['prazo_pagamento'], dados['faturamento']
+        ))
+        # Atualiza o status da cotação para 'Fechada' ao receber o primeiro orçamento
+        cursor.execute("UPDATE cotacoes SET status = 'Fechada' WHERE id = ? AND status = 'Aberta'", (dados['cotacao_id'],))
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def aprovar_orcamento(orcamento_id, user_id):
+    """Aprova um orçamento, atualiza os status e cria um Pedido de Compra."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Pega os dados do orçamento e da cotação
+        orcamento = pd.read_sql('SELECT * FROM orcamentos WHERE id = ?', conn, params=(orcamento_id,)).iloc[0].to_dict()
+        cotacao = pd.read_sql('SELECT * FROM cotacoes WHERE id = ?', conn, params=(orcamento['cotacao_id'],)).iloc[0].to_dict()
+        fornecedor = pd.read_sql('SELECT cnpj FROM fornecedores WHERE id = ?', conn, params=(orcamento['fornecedor_id'],)).iloc[0].to_dict()
+
+        # 2. Marca o orçamento como aprovado
+        cursor.execute("UPDATE orcamentos SET aprovado = 1 WHERE id = ?", (orcamento_id,))
+
+        # 3. Atualiza o status da cotação para Aprovada
+        cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ?", (datetime.now().strftime('%Y-%m-%d'), cotacao['id']))
+
+        # 4. Cria o Pedido de Compra
+        cursor.execute('''
+            INSERT INTO pedidos_compra (orcamento_id, user_id, item, quantidade, valor, data_abertura, status, fornecedor_cnpj)
+            VALUES (?, ?, ?, ?, ?, ?, 'Aberto', ?)
+        ''', (
+            orcamento_id, user_id, cotacao['item'], cotacao['quantidade'], orcamento['valor'],
+            datetime.now().strftime('%Y-%m-%d'), fornecedor['cnpj']
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro ao aprovar orçamento: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_orcamentos_por_cotacao_id(cotacao_id):
+    """Busca todos os orçamentos de uma cotação específica."""
+    conn = get_db_connection()
+    query = '''
+        SELECT o.*, f.nome as fornecedor_nome
+        FROM orcamentos o
+        JOIN fornecedores f ON o.fornecedor_id = f.id
+        WHERE o.cotacao_id = ?
+        ORDER BY o.valor ASC
+    '''
+    df = pd.read_sql(query, conn, params=(cotacao_id,))
+    conn.close()
+    return df.to_dict('records')
+
+
+# --- Funções de Dealer Intelligence (Atualizadas) ---
+
+def obter_dealer_intelligence(data_inicio, data_fim):
+    conn = get_db_connection()
+
+    # Query para pegar todos os orçamentos no período
+    query_orcamentos = '''
+        SELECT c.id as cotacao_id, o.valor
+        FROM orcamentos o
+        JOIN cotacoes c ON o.cotacao_id = c.id
+        WHERE c.data_registro BETWEEN ? AND ?
+    '''
+    df_orcamentos = pd.read_sql(query_orcamentos, conn, params=(data_inicio, data_fim))
+
+    # Query para pegar apenas os pedidos finalizados (orçamentos aprovados)
+    query_pedidos = '''
+        SELECT p.valor, p.data_abertura, p.data_finalizacao, o.cotacao_id
+        FROM pedidos_compra p
+        JOIN orcamentos o ON p.orcamento_id = o.id
+        WHERE p.status = 'Finalizado' AND p.data_abertura BETWEEN ? AND ?
+    '''
+    df_pedidos = pd.read_sql(query_pedidos, conn, params=(data_inicio, data_fim))
+
+    conn.close()
+
+    total_fechado = df_pedidos['valor'].sum() if not df_pedidos.empty else 0
+    total_orcado = 0
+    valor_poupado = 0
+    descontos_perdidos = 0
+
+    if not df_orcamentos.empty:
+        # Total orçado é a soma do menor orçamento de cada cotação
+        total_orcado = df_orcamentos.groupby('cotacao_id')['valor'].min().sum()
+
+        # Calcula o valor poupado e os descontos perdidos
+        for cotacao_id, group in df_orcamentos.groupby('cotacao_id'):
+            if cotacao_id in df_pedidos['cotacao_id'].values:
+                menor_valor = group['valor'].min()
+                valor_aprovado = df_pedidos[df_pedidos['cotacao_id'] == cotacao_id]['valor'].iloc[0]
+
+                if valor_aprovado < menor_valor: # Caso de desconto extra
+                     valor_poupado += menor_valor - valor_aprovado
+                elif valor_aprovado > menor_valor:
+                    descontos_perdidos += valor_aprovado - menor_valor
+
+    # Cálculo do tempo de processamento
+    media_dias_processamento = 0
+    relatorio_processamento = []
+    if not df_pedidos.empty and 'data_finalizacao' in df_pedidos.columns:
+        df_pedidos['data_abertura'] = pd.to_datetime(df_pedidos['data_abertura'])
+        df_pedidos['data_finalizacao'] = pd.to_datetime(df_pedidos['data_finalizacao'])
+        df_pedidos['dias_processamento'] = (df_pedidos['data_finalizacao'] - df_pedidos['data_abertura']).dt.days
+        media_dias_processamento = df_pedidos['dias_processamento'].mean()
+        relatorio_processamento = df_pedidos[['data_abertura', 'data_finalizacao', 'dias_processamento']].to_dict('records')
+
+    return {
+        'total_fechado': total_fechado,
+        'total_orcado': total_orcado,
+        'valor_poupado': valor_poupado,
+        'descontos_perdidos': descontos_perdidos,
+        'media_dias_processamento': media_dias_processamento if pd.notna(media_dias_processamento) else 0,
+        'relatorio_processamento': relatorio_processamento
+    }
+
+
+# --- O resto das funções (usuários, abastecimentos, etc.) permanecem as mesmas ---
+# (O código das outras funções foi omitido para brevidade, mas deve ser mantido como estava)
+
 def get_user_by_username(username):
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
@@ -241,7 +352,6 @@ def create_user(username, password, role):
     cursor = conn.cursor()
     try:
         password_hash = generate_password_hash(password)
-        # Verifica se a role é válida
         if role not in ['Administrador', 'Gestor', 'Comprador', 'Padrão']:
             raise ValueError("Role inválida.")
         cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", (username, password_hash, role))
@@ -259,7 +369,6 @@ def update_user(user_id, username, role, password=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Verifica se a role é válida
         if role not in ['Administrador', 'Gestor', 'Comprador', 'Padrão']:
             raise ValueError("Role inválida.")
         
@@ -289,7 +398,6 @@ def delete_user(user_id):
     finally:
         conn.close()
 
-# --- Funções de Fornecedor ---
 def criar_fornecedor(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -311,7 +419,6 @@ def obter_fornecedores():
     conn.close()
     return df.to_dict('records')
 
-# --- Funções de Cotação ---
 def criar_cotacao(user_id, dados):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -325,62 +432,6 @@ def criar_cotacao(user_id, dados):
     finally:
         conn.close()
 
-def obter_cotacoes():
-    conn = get_db_connection()
-    query = '''
-        SELECT 
-            c.*, 
-            u.username as solicitante,
-            f.nome as fornecedor_nome
-        FROM cotacoes c
-        JOIN users u ON c.user_id = u.id
-        LEFT JOIN fornecedores f ON c.fornecedor_id = f.id
-        ORDER BY c.data_registro DESC
-    '''
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df.to_dict('records')
-
-def fechar_cotacao(id, dados):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        fornecedor = conn.execute('SELECT cnpj FROM fornecedores WHERE id = ?', (dados['fornecedor_id'],)).fetchone()
-        fornecedor_cnpj = fornecedor['cnpj'] if fornecedor else None
-        
-        cursor.execute('''
-            UPDATE cotacoes 
-            SET fornecedor_id = ?, valor_fechado = ?, prazo_pagamento = ?, faturamento = ?, status = 'Fechada'
-            WHERE id = ? AND status = 'Aberta'
-        ''', (dados['fornecedor_id'] or None, float(dados['valor_fechado']), dados['prazo_pagamento'], dados['faturamento'], id))
-        conn.commit()
-        return cursor.rowcount > 0, fornecedor_cnpj
-    finally:
-        conn.close()
-
-def aprovar_cotacao(id, user_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        # 1. Atualizar status da cotação para Aprovada
-        cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ? AND status = 'Fechada'", (datetime.now().strftime('%Y-%m-%d'), id))
-        
-        cotacao = pd.read_sql('SELECT * FROM cotacoes WHERE id = ?', conn, params=(id,)).iloc[0].to_dict()
-        fornecedor = pd.read_sql('SELECT cnpj FROM fornecedores WHERE id = ?', conn, params=(cotacao['fornecedor_id'],)).iloc[0].to_dict()
-
-        if cursor.rowcount > 0 and cotacao:
-            # 2. Gerar Pedido de Compra
-            cursor.execute('''
-                INSERT INTO pedidos_compra (quote_id, user_id, item, quantidade, valor, data_abertura, status, fornecedor_cnpj)
-                VALUES (?, ?, ?, ?, ?, ?, 'Aberto', ?)
-            ''', (id, user_id, cotacao['item'], cotacao['quantidade'], cotacao['valor_fechado'], datetime.now().strftime('%Y-%m-%d'), fornecedor['cnpj']))
-            conn.commit()
-            return True
-        return False
-    finally:
-        conn.close()
-
-# --- Funções de Pedido de Compra (NOVO) ---
 def obter_pedidos_compra():
     conn = get_db_connection()
     query = '''
@@ -443,54 +494,6 @@ def finalizar_pedido_compra(id, dados):
     finally:
         conn.close()
 
-# --- Funções de Dealer Intelligence (NOVO) ---
-def obter_dealer_intelligence(data_inicio, data_fim):
-    conn = get_db_connection()
-    
-    query_valores = '''
-        SELECT 
-            SUM(CASE WHEN p.status = 'Finalizado' THEN p.valor ELSE 0 END) as total_fechado,
-            SUM(c.valor_fechado) as total_orcado
-        FROM cotacoes c
-        LEFT JOIN pedidos_compra p ON c.id = p.quote_id
-        WHERE c.data_registro BETWEEN ? AND ?
-    '''
-    
-    query_tempo = '''
-        SELECT
-            p.data_abertura,
-            p.data_finalizacao
-        FROM pedidos_compra p
-        WHERE p.data_finalizacao IS NOT NULL AND p.data_abertura BETWEEN ? AND ?
-    '''
-
-    df_valores = pd.read_sql(query_valores, conn, params=(data_inicio, data_fim))
-    df_tempo = pd.read_sql(query_tempo, conn, params=(data_inicio, data_fim))
-
-    conn.close()
-    
-    total_fechado = df_valores['total_fechado'].iloc[0] if not df_valores.empty else 0
-    total_orcado = df_valores['total_orcado'].iloc[0] if not df_valores.empty else 0
-    
-    relatorio_processamento = []
-    media_dias_processamento = 0
-    
-    if not df_tempo.empty:
-        df_tempo['data_abertura'] = pd.to_datetime(df_tempo['data_abertura'])
-        df_tempo['data_finalizacao'] = pd.to_datetime(df_tempo['data_finalizacao'])
-        df_tempo['dias_processamento'] = (df_tempo['data_finalizacao'] - df_tempo['data_abertura']).dt.days
-        media_dias_processamento = df_tempo['dias_processamento'].mean()
-        
-        relatorio_processamento = df_tempo[['data_abertura', 'data_finalizacao', 'dias_processamento']].to_dict('records')
-
-    return {
-        'total_fechado': total_fechado,
-        'total_orcado': total_orcado,
-        'media_dias_processamento': media_dias_processamento if pd.notna(media_dias_processamento) else 0,
-        'relatorio_processamento': relatorio_processamento
-    }
-
-# --- Funções Antigas (Mantidas/Corrigidas) ---
 def obter_precos_combustivel(): 
     conn = get_db_connection()
     query = "SELECT combustivel, preco, data_atualizacao FROM precos_combustivel ORDER BY combustivel"
@@ -1132,5 +1135,85 @@ def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimet
     except Exception as e:
         print(f"Erro ao atualizar troca de óleo: {e}")
         return False
+    finally:
+        conn.close()
+
+
+def criar_checklist(dados):
+    """Cria um novo registro de checklist."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = """
+    INSERT INTO checklists (identificacao, data, horimetro, nivel_oleo, observacoes, itens_checklist)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """
+    try:
+        horimetro = float(dados['horimetro']) if dados.get('horimetro') else None
+        cursor.execute(query, (
+            dados['identificacao'], dados['data'], horimetro,
+            dados['nivel_oleo'], dados.get('observacoes', ''), dados.get('itens_checklist', '')
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def obter_checklist_por_id(id):
+    """Obtém um checklist específico pelo ID."""
+    conn = get_db_connection()
+    try:
+        checklist = conn.execute('SELECT * FROM checklists WHERE id = ?', (id,)).fetchone()
+        return dict(checklist) if checklist else None
+    finally:
+        conn.close()
+
+def atualizar_checklist(id, dados):
+    """Atualiza um registro de checklist."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = """
+    UPDATE checklists SET
+        identificacao = ?, data = ?, horimetro = ?, nivel_oleo = ?,
+        observacoes = ?, itens_checklist = ?
+    WHERE id = ?
+    """
+    try:
+        horimetro = float(dados['horimetro']) if dados.get('horimetro') else None
+        cursor.execute(query, (
+            dados['identificacao'], dados['data'], horimetro,
+            dados['nivel_oleo'], dados.get('observacoes', ''),
+            dados.get('itens_checklist', ''), id
+        ))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def excluir_checklist(id):
+    """Exclui um checklist pelo ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('DELETE FROM checklists WHERE id = ?', (id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def obter_cotacao_por_id(cotacao_id):
+    """Busca uma cotação específica pelo seu ID."""
+    conn = get_db_connection()
+    try:
+        # A consulta junta com users para obter o nome do solicitante
+        query = """
+            SELECT c.*, u.username as solicitante
+            FROM cotacoes c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.id = ?
+        """
+        df = pd.read_sql_query(query, conn, params=(cotacao_id,))
+        if not df.empty:
+            return df.iloc[0].to_dict()
+        return None
     finally:
         conn.close()

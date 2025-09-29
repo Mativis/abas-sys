@@ -185,8 +185,8 @@
                 </a>
                 <ul class="collapse list-unstyled" id="dealersSubmenu">
                     {% if g.user.role in ['Administrador', 'Gestor', 'Comprador'] %}
-                    <li><a class="{{ 'active' if active_page == 'pedidos_compra' }}" href="{{ url_for('pedidos_compra') }}">Pedidos</a></li>
-                    <li><a class="{{ 'active' if active_page == 'cotacoes' }}" href="{{ url_for('cotacoes') }}">Cotações</a></li>
+                    <li><a class="{{ 'active' if active_page == 'pedidos_compra' }}" href="{{ url_for('pedidos_relatorio') }}">Pedidos</a></li>
+                    <li><a class="{{ 'active' if active_page == 'cotacoes' }}" href="{{ url_for('cotacoes_relatorio') }}">Cotações</a></li>
                     <li><a class="{{ 'active' if active_page == 'fornecedores' }}" href="{{ url_for('fornecedores') }}">Fornecedores</a></li>
                     {% endif %}
                     {% if g.user.role in ['Administrador', 'Gestor'] %}

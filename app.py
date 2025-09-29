@@ -13,8 +13,9 @@ from functools import wraps
 from werkzeug.utils import secure_filename
 import json
 
-from database import ( 
-    criar_tabelas, 
+# A importação do database.py permanece a mesma, mas adicionamos obter_cotacao_por_id
+from database import (
+    criar_tabelas,
     obter_relatorio,
     calcular_medias_veiculos,
     obter_precos_combustivel,
@@ -32,6 +33,7 @@ from database import (
     obter_checklists_por_identificacao,
     excluir_troca_oleo,
     obter_troca_oleo_por_identificacao_tipo,
+    atualizar_troca_oleo,
     obter_manutencoes,
     obter_manutencao_por_id,
     criar_manutencao,
@@ -44,19 +46,24 @@ from database import (
     atualizar_pedagio,
     excluir_pedagio,
     obter_checklists,
-    # NOVAS FUNÇÕES DEALERS
+    criar_checklist,
+    obter_checklist_por_id,
+    atualizar_checklist,
+    excluir_checklist,
     get_user_by_username,
     get_user_by_id,
-    get_all_users, # Adicionado para user_management
-    create_user, # Adicionado para user_management
-    update_user, # Adicionado para user_management
-    delete_user, # Adicionado para user_management
+    get_all_users,
+    create_user,
+    update_user,
+    delete_user,
     obter_fornecedores,
     criar_fornecedor,
     obter_cotacoes,
     criar_cotacao,
-    fechar_cotacao,
-    aprovar_cotacao,
+    obter_cotacao_por_id, # <-- NOVA FUNÇÃO IMPORTADA
+    adicionar_orcamento,
+    aprovar_orcamento,
+    obter_orcamentos_por_cotacao_id,
     obter_pedidos_compra,
     obter_pedido_compra_por_id,
     atualizar_pedido_compra,
@@ -64,23 +71,20 @@ from database import (
     obter_dealer_intelligence
 )
 
+
 app = Flask(__name__)
 app.secret_key = 'sua_chave_secreta_aqui_123'
 app.config['STATIC_FOLDER'] = 'static'
 
-# Configuração de pastas
 os.makedirs(app.config['STATIC_FOLDER'], exist_ok=True)
 UPLOAD_FOLDER = os.path.join(app.config['STATIC_FOLDER'], 'dealer_files')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- Controles de Acesso ---
+# --- Controles de Acesso (sem alterações) ---
 @app.before_request
 def load_logged_in_user():
     user_id = session.get('user_id')
-    if user_id is None:
-        g.user = None
-    else:
-        g.user = get_user_by_id(user_id)
+    g.user = get_user_by_id(user_id) if user_id else None
 
 def login_required(view):
     @wraps(view)
@@ -98,40 +102,139 @@ def roles_required(roles):
             if g.user is None:
                 flash('Você precisa estar logado para acessar esta página.', 'warning')
                 return redirect(url_for('login'))
-                
-            # LÓGICA DE SUPER-ROLE: Concede acesso total ao Administrador
-            if g.user['role'] == 'Administrador':
-                return view(*args, **kwargs)
-                
-            if g.user['role'] not in roles:
+            if g.user['role'] not in roles and g.user['role'] != 'Administrador':
                 flash('Acesso negado. Sua função não permite acessar esta página.', 'danger')
                 return redirect(url_for('index'))
             return view(*args, **kwargs)
         return wrapped_view
     return wrapper
 
-# --- Funções Auxiliares ---
-def gerar_grafico(df, x_col, y_cols, title, tipo='bar', filename='grafico.png'):
-    plt.figure(figsize=(10, 5))
-    if tipo == 'bar':
-        df.plot(x=x_col, y=y_cols, kind='bar')
-    else:
-        for col in y_cols:
-            plt.plot(df[x_col], df[col], marker='o', label=col)
-    
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    
-    grafico_path = os.path.join(app.config['STATIC_FOLDER'], filename)
-    plt.savefig(grafico_path)
-    plt.close()
-    
-    return grafico_path
+# --- Rotas de Cotações e Orçamentos (REFORMULADAS) ---
 
-# --- Rotas de Autenticação ---
+@app.route('/dealers/cotacoes-relatorio', methods=['GET', 'POST'])
+@login_required
+def cotacoes_relatorio():
+    """Página que lista todas as cotações (Relatório)."""
+    if request.method == 'POST': # Para a criação de uma nova cotação
+        try:
+            dados = {
+                'item': request.form['item'],
+                'quantidade': request.form['quantidade'],
+                'data_limite': request.form['data_limite'],
+                'observacoes': request.form['observacoes']
+            }
+            cotacao_id = criar_cotacao(session['user_id'], dados)
+            if cotacao_id:
+                flash('Cotação criada com sucesso!', 'success')
+                return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id)) # Redireciona para a nova página de detalhes
+            else:
+                flash('Erro ao criar cotação.', 'danger')
+        except Exception as e:
+            flash(f'Erro na operação: {str(e)}', 'danger')
+        return redirect(url_for('cotacoes_relatorio'))
+
+    cotacoes_list = obter_cotacoes()
+    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list)
+
+@app.route('/dealers/cotacao/<int:cotacao_id>', methods=['GET', 'POST'])
+@login_required
+def cotacao_detalhe(cotacao_id):
+    """Página de detalhes de uma cotação específica, onde se gerencia os orçamentos."""
+    user_role = g.user['role']
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        try:
+            if action == 'adicionar_orcamento' and user_role in ['Administrador', 'Comprador', 'Gestor']:
+                dados = {
+                    'cotacao_id': cotacao_id,
+                    'fornecedor_id': request.form.get('fornecedor_id'),
+                    'valor': request.form['valor'],
+                    'prazo_pagamento': request.form['prazo_pagamento'],
+                    'faturamento': request.form['faturamento']
+                }
+                if adicionar_orcamento(dados):
+                    flash('Orçamento adicionado com sucesso!', 'success')
+                else:
+                    flash('Erro ao adicionar orçamento.', 'danger')
+
+            elif action == 'aprovar_orcamento' and user_role in ['Administrador', 'Gestor']:
+                orcamento_id = request.form.get('orcamento_id')
+                if aprovar_orcamento(orcamento_id, session['user_id']):
+                    flash('Orçamento aprovado e Pedido de Compra gerado!', 'success')
+                else:
+                    flash('Erro ao aprovar orçamento.', 'danger')
+        except Exception as e:
+            flash(f'Erro na operação: {str(e)}', 'danger')
+        
+        return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
+
+    cotacao = obter_cotacao_por_id(cotacao_id)
+    orcamentos = obter_orcamentos_por_cotacao_id(cotacao_id)
+    fornecedores = obter_fornecedores()
+    return render_template('cotacao_detalhe.html', active_page='cotacoes', cotacao=cotacao, orcamentos=orcamentos, fornecedores=fornecedores)
+
+
+# --- Rotas de Pedidos de Compra (REFORMULADAS) ---
+
+@app.route('/dealers/pedidos-relatorio')
+@login_required
+def pedidos_relatorio():
+    """Página que lista todos os pedidos de compra (Relatório)."""
+    pedidos_list = obter_pedidos_compra()
+    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list)
+
+@app.route('/dealers/pedido/<int:pedido_id>', methods=['GET', 'POST'])
+@login_required
+def pedido_detalhe(pedido_id):
+    """Página de detalhes de um pedido de compra específico."""
+    user_role = g.user['role']
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        try:
+            if action == 'editar' and user_role in ['Administrador', 'Comprador', 'Gestor']:
+                dados = {'item': request.form['item'], 'quantidade': request.form['quantidade'], 'valor': request.form['valor'], 'status': request.form['status']}
+                if atualizar_pedido_compra(pedido_id, dados):
+                    flash('Pedido de Compra atualizado com sucesso!', 'success')
+                else:
+                    flash('Erro ao atualizar Pedido de Compra.', 'danger')
+
+            elif action == 'finalizar' and user_role in ['Administrador', 'Comprador', 'Gestor']:
+                chave_nfe = request.form.get('nf_e_chave').strip()
+                nfs_file = request.files.get('nfs_pdf')
+                pdf_path = None
+
+                if not chave_nfe and not nfs_file:
+                    flash('Para finalizar, é obrigatório informar a Chave NF-e OU anexar o PDF da NFS.', 'danger')
+                    return redirect(url_for('pedido_detalhe', pedido_id=pedido_id))
+
+                if chave_nfe and len(chave_nfe) not in [44, 54]:
+                    flash('Chave NF-e inválida. Deve ter 44 ou 54 dígitos.', 'danger')
+                    return redirect(url_for('pedido_detalhe', pedido_id=pedido_id))
+                
+                if nfs_file and nfs_file.filename != '' and nfs_file.filename.lower().endswith('.pdf'):
+                    filename = secure_filename(f"nfs_pc{pedido_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf")
+                    pdf_path = os.path.join('dealer_files', filename)
+                    nfs_file.save(os.path.join(app.config['STATIC_FOLDER'], pdf_path))
+                
+                dados = {'nf_e_chave': chave_nfe, 'nfs_pdf_path': pdf_path}
+                if finalizar_pedido_compra(pedido_id, dados):
+                    flash('Pedido de Compra finalizado com sucesso!', 'success')
+                else:
+                    flash('Erro ao finalizar Pedido de Compra.', 'danger')
+            
+        except Exception as e:
+            flash(f'Erro na operação: {str(e)}', 'danger')
+
+        return redirect(url_for('pedido_detalhe', pedido_id=pedido_id))
+
+    pedido = obter_pedido_compra_por_id(pedido_id)
+    return render_template('pedido_detalhe.html', active_page='pedidos_compra', pedido=pedido, user_role=user_role)
+
+# --- O resto das rotas (login, index, abastecimentos, etc.) permanecem as mesmas ---
+# (O código foi omitido para brevidade, mas deve ser mantido como estava)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if g.user:
@@ -162,7 +265,6 @@ def logout():
     flash('Você foi desconectado.', 'info')
     return redirect(url_for('login'))
 
-# --- Rotas Principais (Protegidas) ---
 @app.route('/')
 @login_required
 def index():
@@ -244,7 +346,6 @@ def medias_veiculos():
         dados = calcular_medias_veiculos()
         df = pd.DataFrame(dados)
         if not df.empty:
-            # Mantido sem gerar gráfico aqui, assumindo que o template faz isso via JS.
             pass
         return render_template('medias_veiculos.html', dados=dados, active_page='medias')
     except Exception as e:
@@ -350,8 +451,6 @@ def pedagios():
     
     return render_template('pedagios.html', active_page='pedagios', pedagios=pedagios_list, filtros=filtros, placas_disponiveis=placas_disponiveis)
 
-# --- Rotas do Módulo Dealers (NOVAS) ---
-
 @app.route('/dealers/fornecedores', methods=['GET', 'POST'])
 @login_required
 @roles_required(['Administrador', 'Gestor', 'Comprador'])
@@ -377,99 +476,6 @@ def fornecedores():
     fornecedores_list = obter_fornecedores()
     return render_template('fornecedores.html', active_page='fornecedores', fornecedores=fornecedores_list)
 
-@app.route('/dealers/cotacoes', methods=['GET', 'POST'])
-@login_required
-def cotacoes():
-    user_role = session.get('role')
-    
-    if request.method == 'POST':
-        action = request.form.get('action')
-        cotacao_id = request.form.get('cotacao_id')
-        
-        try:
-            if action == 'criar':
-                dados = {'item': request.form['item'], 'quantidade': request.form['quantidade'], 'data_limite': request.form['data_limite'], 'observacoes': request.form['observacoes']}
-                if criar_cotacao(session['user_id'], dados):
-                    flash('Cotação criada com sucesso!', 'success')
-                else:
-                    flash('Erro ao criar cotação.', 'danger')
-            
-            elif action == 'fechar' and user_role in ['Administrador', 'Comprador']:
-                dados = {'fornecedor_id': request.form.get('fornecedor_id'), 'valor_fechado': request.form['valor_fechado'], 'prazo_pagamento': request.form['prazo_pagamento'], 'faturamento': request.form['faturamento']}
-                success, fornecedor_cnpj = fechar_cotacao(cotacao_id, dados)
-                if success:
-                    flash(f'Cotação fechada com o CNPJ {fornecedor_cnpj}. Aguardando aprovação do Gestor.', 'success')
-                else:
-                    flash('Erro ao fechar cotação. Verifique o status.', 'danger')
-
-            elif action == 'aprovar' and user_role in ['Administrador', 'Gestor']:
-                if aprovar_cotacao(cotacao_id, session['user_id']):
-                    flash('Cotação aprovada! Pedido de Compra gerado.', 'success')
-                else:
-                    flash('Erro ao aprovar cotação ou ela não está no status Fechada.', 'danger')
-        
-        except Exception as e:
-            flash(f'Erro na operação: {str(e)}', 'danger')
-        
-        return redirect(url_for('cotacoes'))
-    
-    cotacoes_list = obter_cotacoes()
-    fornecedores_list = obter_fornecedores()
-    return render_template('cotacoes.html', active_page='cotacoes', cotacoes=cotacoes_list, fornecedores=fornecedores_list)
-
-@app.route('/dealers/pedidos-compra', methods=['GET', 'POST'])
-@login_required
-@roles_required(['Administrador', 'Gestor', 'Comprador'])
-def pedidos_compra():
-    user_role = session.get('role')
-    
-    if request.method == 'POST':
-        pedido_id = request.form.get('pedido_id')
-        action = request.form.get('action')
-        
-        try:
-            if action == 'editar' and user_role in ['Administrador', 'Comprador']:
-                dados = {'item': request.form['item'], 'quantidade': request.form['quantidade'], 'valor': request.form['valor'], 'status': request.form['status']}
-                if atualizar_pedido_compra(pedido_id, dados):
-                    flash('Pedido de Compra atualizado com sucesso!', 'success')
-                else:
-                    flash('Erro ao atualizar Pedido de Compra.', 'danger')
-
-            elif action == 'finalizar' and user_role in ['Administrador', 'Comprador']:
-                chave_nfe = request.form.get('nf_e_chave').strip()
-                nfs_file = request.files.get('nfs_pdf')
-                
-                pdf_path = None
-                
-                if not chave_nfe and not nfs_file:
-                    flash('Para finalizar, é obrigatório informar a Chave NF-e OU anexar o PDF da NFS.', 'danger')
-                    return redirect(url_for('pedidos_compra'))
-
-                if chave_nfe and len(chave_nfe) not in [44, 54]:
-                    flash('Chave NF-e inválida. Deve ter 44 ou 54 dígitos.', 'danger')
-                    return redirect(url_for('pedidos_compra'))
-                
-                if nfs_file and nfs_file.filename != '' and nfs_file.filename.lower().endswith('.pdf'):
-                    filename = secure_filename(f"nfs_pc{pedido_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf")
-                    pdf_path = os.path.join('dealer_files', filename)
-                    nfs_file.save(os.path.join(app.config['STATIC_FOLDER'], pdf_path))
-                
-                dados = {'nf_e_chave': chave_nfe, 'nfs_pdf_path': pdf_path}
-                
-                if finalizar_pedido_compra(pedido_id, dados):
-                    flash('Pedido de Compra finalizado com sucesso!', 'success')
-                else:
-                    flash('Erro ao finalizar Pedido de Compra.', 'danger')
-            
-        except Exception as e:
-            flash(f'Erro na operação: {str(e)}', 'danger')
-
-        return redirect(url_for('pedidos_compra'))
-
-    pedidos_list = obter_pedidos_compra()
-    return render_template('pedidos_compra.html', active_page='pedidos_compra', pedidos=pedidos_list, user_role=user_role)
-
-
 @app.route('/dealers/dealer-intelligence', methods=['GET', 'POST'])
 @login_required
 @roles_required(['Administrador', 'Gestor'])
@@ -492,7 +498,6 @@ def user_management():
     roles = ['Administrador', 'Gestor', 'Comprador', 'Padrão']
     return render_template('user_management.html', active_page='user_management', users=users, roles=roles)
 
-# --- APIs Remanescentes (Mantidas) ---
 @app.route('/api/dashboard')
 @login_required
 def api_dashboard():
@@ -579,7 +584,6 @@ def api_checklists():
     elif request.method == 'POST':
         dados = request.get_json()
         try:
-            from database import criar_checklist
             checklist_id = criar_checklist(dados)
             if checklist_id: return jsonify({'success': True, 'id': checklist_id})
             else: return jsonify({'success': False, 'error': 'Erro ao criar checklist'}), 400
@@ -589,7 +593,6 @@ def api_checklists():
 @app.route('/api/checklists/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @login_required
 def api_checklist(id):
-    from database import obter_checklist_por_id, atualizar_checklist, excluir_checklist
     if request.method == 'GET':
         try:
             checklist = obter_checklist_por_id(id)
@@ -748,7 +751,6 @@ def api_pedido_compra(id):
     if pedido: return jsonify(pedido)
     return jsonify({'error': 'Pedido não encontrado'}), 404
 
-# --- Rotas de Gerenciamento de Usuários ---
 @app.route('/api/users', methods=['POST'])
 @login_required
 @roles_required(['Administrador', 'Gestor'])
@@ -802,7 +804,6 @@ def api_manage_user(user_id):
         else:
             return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
 
-# --- Context Processor e Main ---
 @app.route('/static/<path:filename>')
 def static_files(filename):
     return send_from_directory(app.config['STATIC_FOLDER'], filename)

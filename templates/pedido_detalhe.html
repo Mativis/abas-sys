@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Detalhes do Pedido de Compra #{{ pedido.id }}</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                 <div class="col-md-4"><strong>Item:</strong><p>{{ pedido.item }}</p></div>
+                 <div class="col-md-2"><strong>Quantidade:</strong><p>{{ pedido.quantidade }}</p></div>
+                 <div class="col-md-3"><strong>Fornecedor:</strong><p>{{ pedido.fornecedor_nome or 'N/A' }}</p></div>
+                 <div class="col-md-3"><strong>Valor:</strong><p class="fw-bold">R$ {{ "%.2f"|format(pedido.valor) }}</p></div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                     <h6>Status: <span class="badge {% if pedido.status == 'Finalizado' %}bg-success{% else %}bg-info{% endif %}">{{ pedido.status }}</span></h6>
+                     {% if pedido.status != 'Finalizado' and user_role in ['Administrador', 'Comprador', 'Gestor'] %}
+                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#finalizarPedidoModal">
+                         <i class="bi bi-check-circle"></i> Finalizar Pedido
+                     </button>
+                     <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#editarPedidoModal">
+                         <i class="bi bi-pencil"></i> Editar Pedido
+                     </button>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <h6>Dados Fiscais</h6>
+                    <p><strong>Chave NF-e:</strong> {{ pedido.nf_e_chave or '-' }}</p>
+                    <p><strong>Anexo NFS:</strong> 
+                        {% if pedido.nfs_pdf_path %}
+                        <a href="{{ url_for('static', filename=pedido.nfs_pdf_path) }}" target="_blank">Visualizar PDF</a>
+                        {% else %}-{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="editarPedidoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Pedido de Compra: PC-{{ pedido.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('pedido_detalhe', pedido_id=pedido.id) }}">
+                <input type="hidden" name="action" value="editar">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Item *</label>
+                        <input type="text" class="form-control" name="item" value="{{ pedido.item }}" required>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Quantidade *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" name="quantidade" value="{{ pedido.quantidade }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Valor (R$) *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" name="valor" value="{{ pedido.valor }}" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="Aberto" {% if pedido.status == 'Aberto' %}selected{% endif %}>Aberto</option>
+                            <option value="Em Edição" {% if pedido.status == 'Em Edição' %}selected{% endif %}>Em Edição</option>
+                            <option value="Cancelado" {% if pedido.status == 'Cancelado' %}selected{% endif %}>Cancelado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="finalizarPedidoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Finalizar Pedido: PC-{{ pedido.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('pedido_detalhe', pedido_id=pedido.id) }}" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="finalizar">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        Para finalizar, informe a Chave da NF-e (44 ou 54 dígitos) OU anexe o PDF da NFS.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Chave NF-e (Opcional)</label>
+                        <input type="text" class="form-control" name="nf_e_chave" placeholder="44 ou 54 dígitos">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Anexo PDF da NFS (Opcional)</label>
+                        <input type="file" class="form-control" name="nfs_pdf" accept="application/pdf">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Finalizar Pedido</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

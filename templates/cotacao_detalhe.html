@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Detalhes da Cotação #{{ cotacao.id }}</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4"><strong>Item:</strong><p>{{ cotacao.item }}</p></div>
+                <div class="col-md-2"><strong>Quantidade:</strong><p>{{ cotacao.quantidade }}</p></div>
+                <div class="col-md-2"><strong>Status:</strong>
+                    <p><span class="badge {% if cotacao.status == 'Aberta' %}bg-warning{% elif cotacao.status == 'Fechada' %}bg-primary{% elif cotacao.status == 'Aprovada' %}bg-success{% else %}bg-danger{% endif %}">{{ cotacao.status }}</span></p>
+                </div>
+                <div class="col-md-4"><strong>Observações:</strong><p>{{ cotacao.observacoes or 'N/A' }}</p></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Orçamentos Recebidos</h6>
+            {% if cotacao.status in ['Aberta', 'Fechada'] and g.user.role in ['Administrador', 'Comprador', 'Gestor'] %}
+            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#adicionarOrcamentoModal">
+                <i class="bi bi-plus-circle"></i> Adicionar Orçamento
+            </button>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if orcamentos %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fornecedor</th>
+                            <th class="text-end">Valor (R$)</th>
+                            <th>Prazo de Pagamento</th>
+                            <th>Faturamento</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for orcamento in orcamentos %}
+                        <tr class="{{ 'table-success' if orcamento.aprovado else '' }}">
+                            <td>{{ orcamento.fornecedor_nome }}</td>
+                            <td class="text-end fw-bold">R$ {{ "%.2f"|format(orcamento.valor) }}</td>
+                            <td>{{ orcamento.prazo_pagamento or '-' }}</td>
+                            <td>{{ orcamento.faturamento or '-' }}</td>
+                            <td class="text-center">
+                                {% if cotacao.status == 'Fechada' and g.user.role in ['Administrador', 'Gestor'] %}
+                                <form method="POST" action="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="d-inline">
+                                    <input type="hidden" name="action" value="aprovar_orcamento">
+                                    <input type="hidden" name="orcamento_id" value="{{ orcamento.id }}">
+                                    <button type="submit" class="btn btn-sm btn-success" title="Aprovar este orçamento">
+                                        <i class="bi bi-check-lg"></i> Aprovar
+                                    </button>
+                                </form>
+                                {% elif orcamento.aprovado %}
+                                <span class="badge bg-success">Aprovado</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center text-muted">Nenhum orçamento adicionado para esta cotação ainda.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="adicionarOrcamentoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Orçamento para Cotação #{{ cotacao.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}">
+                <input type="hidden" name="action" value="adicionar_orcamento">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Fornecedor *</label>
+                        <select class="form-select" name="fornecedor_id" required>
+                            <option value="">Selecione...</option>
+                            {% for forn in fornecedores %}
+                            <option value="{{ forn.id }}">{{ forn.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Valor (R$) *</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" name="valor" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Prazo de Pagamento</label>
+                        <input type="text" class="form-control" name="prazo_pagamento">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Faturamento</label>
+                        <input type="text" class="form-control" name="faturamento">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Orçamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <div><i class="bi bi-file-earmark-text me-2"></i> Relatório de Cotações</div>
+        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novaCotacaoModal">
+            <i class="bi bi-plus-circle me-1"></i> Nova Cotação
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Item</th>
+                        <th>Solicitante</th>
+                        <th>Data Limite</th>
+                        <th>Status</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cotacao in cotacoes %}
+                    <tr>
+                        <td>C-{{ cotacao.id }}</td>
+                        <td>{{ cotacao.item }}</td>
+                        <td><span class="badge bg-secondary">{{ cotacao.solicitante }}</span></td>
+                        <td>{{ cotacao.data_limite }}</td>
+                        <td>
+                            <span class="badge {% if cotacao.status == 'Aberta' %}bg-warning{% elif cotacao.status == 'Fechada' %}bg-primary{% elif cotacao.status == 'Aprovada' %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ cotacao.status }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="btn btn-sm btn-outline-info" title="Ver Detalhes e Orçamentos">
+                                <i class="bi bi-eye"></i> Detalhes
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4">Nenhuma cotação cadastrada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="novaCotacaoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Solicitar Nova Cotação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('cotacoes_relatorio') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Item *</label>
+                        <input type="text" class="form-control" name="item" required>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Quantidade *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" name="quantidade" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data Limite de Necessidade *</label>
+                            <input type="date" class="form-control" name="data_limite" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" name="observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Criar e Ver Detalhes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
