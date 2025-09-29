@@ -1,109 +1,105 @@
 import sqlite3
 import pandas as pd
 
-def migrar_dados_seguro():
-    """
-    Executa uma migração de banco de dados robusta, que pode ser executada novamente em caso de falha.
-    """
+def migrar_para_multi_item():
     db_file = 'abastecimentos.db'
-    
-    print("Iniciando a migração segura do banco de dados...")
-    
+    print("Iniciando migração para múltiplos itens...")
     conn = None
     try:
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
 
-        print("Passo 0: Limpando tentativas de migração anteriores (se houver)...")
-        # Remove tabelas que podem ter sido criadas em uma tentativa anterior que falhou
-        cursor.execute("DROP TABLE IF EXISTS orcamentos")
-        cursor.execute("DROP TABLE IF EXISTS cotacoes")
-        cursor.execute("DROP TABLE IF EXISTS pedidos_compra")
-        # Renomeia as tabelas antigas de volta se o script falhou após renomear
-        try:
-            cursor.execute("ALTER TABLE cotacoes_old RENAME TO cotacoes")
-        except sqlite3.OperationalError:
-            pass # Ignora o erro se cotacoes_old não existir
-        try:
-            cursor.execute("ALTER TABLE pedidos_compra_old RENAME TO pedidos_compra")
-        except sqlite3.OperationalError:
-            pass # Ignora o erro se pedidos_compra_old não existir
+        # -- PASSO 1: LIMPEZA DE TENTATIVAS ANTERIORES --
+        print("Limpando tentativas anteriores...")
+        cursor.execute("DROP TABLE IF EXISTS cotacoes_new")
+        cursor.execute("DROP TABLE IF EXISTS cotacao_itens")
+        cursor.execute("DROP TABLE IF EXISTS orcamentos_new")
+        cursor.execute("DROP TABLE IF EXISTS pedidos_compra_new")
+        cursor.execute("DROP TABLE IF EXISTS pedido_itens")
 
-        print("Passo 1: Renomeando tabelas antigas para backup...")
-        cursor.execute("ALTER TABLE cotacoes RENAME TO cotacoes_old")
-        cursor.execute("ALTER TABLE pedidos_compra RENAME TO pedidos_compra_old")
+        # -- PASSO 2: RENOMEAR TABELAS ANTIGAS --
+        print("Renomeando tabelas antigas...")
+        cursor.execute("ALTER TABLE cotacoes RENAME TO cotacoes_old_single_item")
+        cursor.execute("ALTER TABLE orcamentos RENAME TO orcamentos_old_single_item")
+        cursor.execute("ALTER TABLE pedidos_compra RENAME TO pedidos_compra_old_single_item")
+
+        # -- PASSO 3: CRIAR NOVAS TABELAS --
+        print("Criando novas tabelas...")
+        cursor.execute('''
+            CREATE TABLE cotacoes (
+                id INTEGER PRIMARY KEY, user_id INTEGER, titulo TEXT, data_limite TEXT,
+                observacoes TEXT, status TEXT, data_aprovacao TEXT, data_registro TEXT
+            )''')
+        cursor.execute('''
+            CREATE TABLE cotacao_itens (
+                id INTEGER PRIMARY KEY, cotacao_id INTEGER, descricao TEXT, quantidade REAL
+            )''')
+        cursor.execute('''
+            CREATE TABLE orcamentos (
+                id INTEGER PRIMARY KEY, cotacao_id INTEGER, fornecedor_id INTEGER, valor REAL,
+                prazo_pagamento TEXT, faturamento TEXT, data_registro TEXT, aprovado BOOLEAN
+            )''')
+        cursor.execute('''
+            CREATE TABLE pedidos_compra (
+                id INTEGER PRIMARY KEY, cotacao_id INTEGER, user_id INTEGER, fornecedor_id INTEGER,
+                valor_total REAL, data_abertura TEXT, status TEXT, data_finalizacao TEXT,
+                nf_e_chave TEXT, nfs_pdf_path TEXT, data_registro TEXT
+            )''')
+        cursor.execute('''
+            CREATE TABLE pedido_itens (
+                id INTEGER PRIMARY KEY, pedido_id INTEGER, descricao TEXT, quantidade REAL
+            )''')
         
-        print("Passo 2: Criando novas tabelas com a estrutura correta...")
-        # Cria a nova tabela de cotações (simplificada)
-        cursor.execute('''
-        CREATE TABLE cotacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, item TEXT NOT NULL,
-            quantidade REAL NOT NULL, data_limite TEXT NOT NULL, observacoes TEXT,
-            status TEXT DEFAULT 'Aberta', data_aprovacao TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-        ''')
-        # Cria a nova tabela de orçamentos
-        cursor.execute('''
-        CREATE TABLE orcamentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, cotacao_id INTEGER NOT NULL, fornecedor_id INTEGER NOT NULL,
-            valor REAL NOT NULL, prazo_pagamento TEXT, faturamento TEXT,
-            data_registro TEXT DEFAULT CURRENT_TIMESTAMP, aprovado BOOLEAN DEFAULT 0,
-            FOREIGN KEY (cotacao_id) REFERENCES cotacoes (id),
-            FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
-        )
-        ''')
-        # Cria a nova tabela de pedidos de compra com a coluna 'orcamento_id'
-        cursor.execute('''
-        CREATE TABLE pedidos_compra (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, orcamento_id INTEGER, user_id INTEGER NOT NULL,
-            item TEXT NOT NULL, quantidade REAL NOT NULL, valor REAL NOT NULL, fornecedor_cnpj TEXT,
-            status TEXT DEFAULT 'Aberto', nf_e_chave TEXT, nfs_pdf_path TEXT, data_abertura TEXT NOT NULL,
-            data_finalizacao TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (orcamento_id) REFERENCES orcamentos (id)
-        )
-        ''')
-
-        print("Passo 3: Migrando dados das cotações antigas...")
-        df_cotacoes_old = pd.read_sql_query("SELECT * FROM cotacoes_old", conn)
+        # -- PASSO 4: MIGRAR DADOS --
+        print("Migrando dados...")
+        
+        # Migrar Cotações e criar itens
+        df_cotacoes_old = pd.read_sql("SELECT * FROM cotacoes_old_single_item", conn)
         for _, row in df_cotacoes_old.iterrows():
             cursor.execute(
-                'INSERT INTO cotacoes (id, user_id, item, quantidade, data_limite, observacoes, status, data_aprovacao, data_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (row['id'], row['user_id'], row['item'], row['quantidade'], row['data_limite'], row['observacoes'], row['status'], row['data_aprovacao'], row['data_registro'])
+                'INSERT INTO cotacoes (id, user_id, titulo, data_limite, observacoes, status, data_aprovacao, data_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                (row['id'], row['user_id'], row['item'], row['data_limite'], row['observacoes'], row['status'], row['data_aprovacao'], row['data_registro'])
             )
-            if pd.notna(row['fornecedor_id']) and pd.notna(row['valor_fechado']):
-                aprovado_status = 1 if row['status'] == 'Aprovada' else 0
-                cursor.execute(
-                    'INSERT INTO orcamentos (cotacao_id, fornecedor_id, valor, prazo_pagamento, faturamento, aprovado) VALUES (?, ?, ?, ?, ?, ?)',
-                    (row['id'], row['fornecedor_id'], row['valor_fechado'], row['prazo_pagamento'], row['faturamento'], aprovado_status)
-                )
+            cursor.execute(
+                'INSERT INTO cotacao_itens (cotacao_id, descricao, quantidade) VALUES (?, ?, ?)',
+                (row['id'], row['item'], row['quantidade'])
+            )
 
-        print("Passo 4: Migrando dados dos pedidos de compra antigos...")
-        df_pedidos_old = pd.read_sql_query("SELECT * FROM pedidos_compra_old", conn)
+        # Migrar Orçamentos
+        df_orcamentos_old = pd.read_sql("SELECT * FROM orcamentos_old_single_item", conn)
+        for _, row in df_orcamentos_old.iterrows():
+             cursor.execute(
+                'INSERT INTO orcamentos (id, cotacao_id, fornecedor_id, valor, prazo_pagamento, faturamento, data_registro, aprovado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                (row['id'], row['cotacao_id'], row['fornecedor_id'], row['valor'], row['prazo_pagamento'], row['faturamento'], row['data_registro'], row['aprovado'])
+            )
+
+        # Migrar Pedidos de Compra e criar seus itens
+        df_pedidos_old = pd.read_sql("SELECT * FROM pedidos_compra_old_single_item", conn)
+        fornecedores_df = pd.read_sql("SELECT id, cnpj FROM fornecedores", conn).set_index('cnpj')
+        
         for _, row in df_pedidos_old.iterrows():
-            orcamento_id_novo = None
-            if pd.notna(row.get('quote_id')):
-                cursor.execute("SELECT id FROM orcamentos WHERE cotacao_id = ?", (row['quote_id'],))
-                res = cursor.fetchone()
-                if res:
-                    orcamento_id_novo = res[0]
+            fornecedor_id = fornecedores_df.index.get_loc(row['fornecedor_cnpj']) if row['fornecedor_cnpj'] in fornecedores_df.index else None
             
             cursor.execute(
-                'INSERT INTO pedidos_compra (id, orcamento_id, user_id, item, quantidade, valor, fornecedor_cnpj, status, nf_e_chave, nfs_pdf_path, data_abertura, data_finalizacao, data_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (row['id'], orcamento_id_novo, row['user_id'], row['item'], row['quantidade'], row['valor'], row['fornecedor_cnpj'], row['status'], row['nf_e_chave'], row['nfs_pdf_path'], row['data_abertura'], row['data_finalizacao'], row['data_registro'])
+                'INSERT INTO pedidos_compra (id, cotacao_id, user_id, fornecedor_id, valor_total, data_abertura, status, data_finalizacao, nf_e_chave, nfs_pdf_path, data_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (row['id'], row.get('orcamento_id'), row['user_id'], fornecedor_id, row['valor'], row['data_abertura'], row['status'], row['data_finalizacao'], row['nf_e_chave'], row['nfs_pdf_path'], row['data_registro'])
+            )
+            cursor.execute(
+                'INSERT INTO pedido_itens (pedido_id, descricao, quantidade) VALUES (?, ?, ?)',
+                (row['id'], row['item'], row['quantidade'])
             )
 
-        print("Passo 5: Removendo tabelas de backup...")
-        cursor.execute("DROP TABLE cotacoes_old")
-        cursor.execute("DROP TABLE pedidos_compra_old")
-        
+        # -- PASSO 5: LIMPAR TABELAS ANTIGAS --
+        print("Removendo tabelas de backup...")
+        cursor.execute("DROP TABLE cotacoes_old_single_item")
+        cursor.execute("DROP TABLE orcamentos_old_single_item")
+        cursor.execute("DROP TABLE pedidos_compra_old_single_item")
+
         conn.commit()
-        print("\nMigração concluída com sucesso! Seus dados foram preservados e a estrutura do banco de dados foi atualizada.")
+        print("\nMigração para múltiplos itens concluída com sucesso!")
 
     except Exception as e:
         print(f"\nOcorreu um erro durante a migração: {e}")
-        print("A operação foi revertida (rollback).")
         if conn:
             conn.rollback()
     finally:
@@ -111,5 +107,4 @@ def migrar_dados_seguro():
             conn.close()
 
 if __name__ == '__main__':
-    # Lembre-se: Faça um backup do seu arquivo 'abastecimentos.db' antes de rodar!
-    migrar_dados_seguro()
+    migrar_para_multi_item()

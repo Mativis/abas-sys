@@ -17,86 +17,59 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# A função criar_tabelas é usada apenas para novas instalações.
+# A migração de um banco existente deve ser feita com o script migracao_multi_item.py
 def criar_tabelas():
-    """Cria todas as tabelas necessárias no banco de dados."""
+    """Cria o esquema de banco de dados para uma nova instalação."""
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    # Tabela de cotações (SIMPLIFICADA)
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS cotacoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        item TEXT NOT NULL,
-        quantidade REAL NOT NULL,
-        data_limite TEXT NOT NULL,
-        observacoes TEXT,
-        status TEXT DEFAULT 'Aberta', -- Aberta, Fechada, Aprovada, Rejeitada, Cancelada
-        data_aprovacao TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-
-    # NOVA Tabela de Orçamentos
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS orcamentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cotacao_id INTEGER NOT NULL,
-        fornecedor_id INTEGER NOT NULL,
-        valor REAL NOT NULL,
-        prazo_pagamento TEXT,
-        faturamento TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-        aprovado BOOLEAN DEFAULT 0,
-        FOREIGN KEY (cotacao_id) REFERENCES cotacoes (id),
-        FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
-    )
-    ''')
-
-    # Tabela de pedidos de compra (ATUALIZADA com orcamento_id)
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS pedidos_compra (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        orcamento_id INTEGER,
-        user_id INTEGER NOT NULL,
-        item TEXT NOT NULL,
-        quantidade REAL NOT NULL,
-        valor REAL NOT NULL,
-        fornecedor_cnpj TEXT,
-        status TEXT DEFAULT 'Aberto',
-        nf_e_chave TEXT,
-        nfs_pdf_path TEXT,
-        data_abertura TEXT NOT NULL,
-        data_finalizacao TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (orcamento_id) REFERENCES orcamentos (id)
-    )
-    ''')
-
-    # Demais tabelas permanecem iguais...
-    # (O código das outras tabelas foi omitido para brevidade, mas deve ser mantido como estava)
+    
+    # --- Tabelas Principais ---
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('Administrador', 'Gestor', 'Comprador', 'Padrão'))
-    )
-    ''')
+    )''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS fornecedores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cnpj TEXT NOT NULL UNIQUE,
-        nome TEXT NOT NULL,
-        ie TEXT,
-        endereco TEXT,
-        tipo TEXT,
-        contato TEXT,
-        data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
+        id INTEGER PRIMARY KEY AUTOINCREMENT, cnpj TEXT NOT NULL UNIQUE, nome TEXT NOT NULL, ie TEXT,
+        endereco TEXT, tipo TEXT, contato TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    # --- Tabelas do Módulo Dealers (Estrutura Multi-Item) ---
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS cotacoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, titulo TEXT NOT NULL, data_limite TEXT NOT NULL,
+        observacoes TEXT, status TEXT DEFAULT 'Aberta', data_aprovacao TEXT, data_registro TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS cotacao_itens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, cotacao_id INTEGER NOT NULL, descricao TEXT NOT NULL, quantidade REAL NOT NULL,
+        FOREIGN KEY (cotacao_id) REFERENCES cotacoes (id)
+    )''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS orcamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, cotacao_id INTEGER NOT NULL, fornecedor_id INTEGER NOT NULL,
+        valor REAL NOT NULL, prazo_pagamento TEXT, faturamento TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
+        aprovado BOOLEAN DEFAULT 0,
+        FOREIGN KEY (cotacao_id) REFERENCES cotacoes (id), FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
+    )''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pedidos_compra (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, cotacao_id INTEGER, user_id INTEGER NOT NULL, fornecedor_id INTEGER NOT NULL,
+        valor_total REAL NOT NULL, data_abertura TEXT, status TEXT DEFAULT 'Aberto', data_finalizacao TEXT,
+        nf_e_chave TEXT, nfs_pdf_path TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cotacao_id) REFERENCES cotacoes (id), FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
+    )''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pedido_itens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, pedido_id INTEGER NOT NULL, descricao TEXT NOT NULL, quantidade REAL NOT NULL,
+        FOREIGN KEY (pedido_id) REFERENCES pedidos_compra (id)
+    )''')
+
+    # --- Tabelas de Frotas (sem alterações) ---
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS abastecimentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, placa TEXT NOT NULL, responsavel TEXT,
@@ -104,35 +77,30 @@ def criar_tabelas():
         custo_por_litro REAL NOT NULL, custo_bruto REAL NOT NULL, custo_liquido REAL NOT NULL,
         km_rodados REAL, km_litro REAL, posto TEXT, integracao_atheris BOOLEAN DEFAULT 0,
         data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
+    )''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS pedagios (
         id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, placa TEXT NOT NULL, valor REAL NOT NULL,
         observacoes TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
+    )''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS precos_combustivel (
         id INTEGER PRIMARY KEY AUTOINCREMENT, combustivel TEXT NOT NULL UNIQUE, preco REAL NOT NULL,
         data_atualizacao TEXT NOT NULL
-    )
-    ''')
+    )''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS trocas_oleo (
         id INTEGER PRIMARY KEY AUTOINCREMENT, identificacao TEXT NOT NULL,
         tipo TEXT CHECK(tipo IN ('veiculo', 'maquina')) NOT NULL, data_troca TEXT NOT NULL,
         km_troca REAL, horimetro_troca REAL, proxima_troca_km REAL, proxima_troca_horimetro REAL,
         data_registro TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(identificacao, tipo)
-    )
-    ''')
+    )''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS checklists (
         id INTEGER PRIMARY KEY AUTOINCREMENT, identificacao TEXT NOT NULL, data TEXT NOT NULL,
         horimetro REAL, nivel_oleo TEXT CHECK(nivel_oleo IN ('ADEQUADO', 'BAIXO', 'CRÍTICO')) DEFAULT 'ADEQUADO',
         observacoes TEXT, itens_checklist TEXT, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
+    )''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS manutencoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT, identificacao TEXT NOT NULL, tipo TEXT NOT NULL,
@@ -140,71 +108,82 @@ def criar_tabelas():
         data_abertura TEXT NOT NULL, previsao_conclusao TEXT, data_conclusao TEXT,
         observacoes TEXT, finalizada BOOLEAN DEFAULT 0, prazo_liberacao INTEGER,
         forma_pagamento TEXT, parcelas INTEGER DEFAULT 1, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-
-
-    # Adicionar usuários e preços padrão (se não existirem)
-    cursor.execute("SELECT COUNT(*) FROM users")
-    if cursor.fetchone()[0] == 0:
-        users_iniciais = [
-            ('admin', generate_password_hash('123'), 'Administrador'),
-            ('gestor', generate_password_hash('123'), 'Gestor'),
-            ('comprador', generate_password_hash('123'), 'Comprador'),
-            ('padrao', generate_password_hash('123'), 'Padrão')
-        ]
-        cursor.executemany('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', users_iniciais)
-
-    cursor.execute("SELECT COUNT(*) FROM precos_combustivel")
-    if cursor.fetchone()[0] == 0:
-        precos_iniciais = [
-            ('GASOLINA', 5.890, datetime.now().strftime('%Y-%m-%d')),
-            ('DIESEL S10', 4.950, datetime.now().strftime('%Y-%m-%d')),
-            ('ETANOL', 4.390, datetime.now().strftime('%Y-%m-%d')),
-            ('DESSEL S500', 4.750, datetime.now().strftime('%Y-%m-%d')),
-            ('ARLA', 2.990, datetime.now().strftime('%Y-%m-%d'))
-        ]
-        cursor.executemany('INSERT INTO precos_combustivel (combustivel, preco, data_atualizacao) VALUES (?, ?, ?)', precos_iniciais)
-
-
+    )''')
+    
     conn.commit()
     conn.close()
 
+# --- Funções de Cotação (REESTRUTURADAS) ---
 
-# --- Funções de Cotação (Atualizadas) ---
+def criar_cotacao_com_itens(user_id, dados):
+    """Cria uma cotação (cabeçalho) e seus itens."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO cotacoes (user_id, titulo, data_limite, observacoes, data_registro)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, dados['titulo'], dados['data_limite'], dados.get('observacoes', ''), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        cotacao_id = cursor.lastrowid
+        
+        itens_para_inserir = [(cotacao_id, item['descricao'], float(item['quantidade'])) for item in dados['itens']]
+        
+        cursor.executemany('INSERT INTO cotacao_itens (cotacao_id, descricao, quantidade) VALUES (?, ?, ?)', itens_para_inserir)
+        
+        conn.commit()
+        return cotacao_id
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro ao criar cotação com itens: {e}")
+        return None
+    finally:
+        conn.close()
 
 def obter_cotacoes():
+    """Obtém o relatório de cotações."""
     conn = get_db_connection()
-    # A consulta principal agora busca o orçamento aprovado para exibir na lista principal
     query = '''
         SELECT
-            c.id, c.item, c.quantidade, c.data_limite, c.status,
+            c.id, c.titulo, c.data_limite, c.status,
             u.username as solicitante,
-            f.nome as fornecedor_nome,
-            o.valor as valor_fechado
+            (SELECT COUNT(*) FROM cotacao_itens ci WHERE ci.cotacao_id = c.id) as total_itens,
+            (SELECT SUM(o.valor) FROM orcamentos o WHERE o.cotacao_id = c.id AND o.aprovado = 1) as valor_aprovado
         FROM cotacoes c
         JOIN users u ON c.user_id = u.id
-        LEFT JOIN orcamentos o ON c.id = o.cotacao_id AND o.aprovado = 1
-        LEFT JOIN fornecedores f ON o.fornecedor_id = f.id
         ORDER BY c.data_registro DESC
     '''
     df = pd.read_sql(query, conn)
     conn.close()
     return df.to_dict('records')
 
+def obter_cotacao_por_id(cotacao_id):
+    """Busca um cabeçalho de cotação específico pelo seu ID."""
+    conn = get_db_connection()
+    try:
+        query = "SELECT c.*, u.username as solicitante FROM cotacoes c JOIN users u ON c.user_id = u.id WHERE c.id = ?"
+        df = pd.read_sql_query(query, conn, params=(cotacao_id,))
+        return df.iloc[0].to_dict() if not df.empty else None
+    finally:
+        conn.close()
+
+def obter_itens_por_cotacao_id(cotacao_id):
+    """Busca todos os itens de uma cotação."""
+    conn = get_db_connection()
+    df = pd.read_sql("SELECT * FROM cotacao_itens WHERE cotacao_id = ?", conn, params=(cotacao_id,))
+    conn.close()
+    return df.to_dict('records')
+
+# --- Funções de Orçamento (REESTRUTURADAS) ---
+
 def adicionar_orcamento(dados):
-    """Adiciona uma nova proposta de orçamento a uma cotação existente."""
+    """Adiciona uma nova proposta de orçamento a uma cotação."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
-            INSERT INTO orcamentos (cotacao_id, fornecedor_id, valor, prazo_pagamento, faturamento)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (
-            dados['cotacao_id'], dados['fornecedor_id'],
-            float(dados['valor']), dados['prazo_pagamento'], dados['faturamento']
-        ))
-        # Atualiza o status da cotação para 'Fechada' ao receber o primeiro orçamento
+        cursor.execute(
+            'INSERT INTO orcamentos (cotacao_id, fornecedor_id, valor, prazo_pagamento, faturamento) VALUES (?, ?, ?, ?, ?)',
+            (dados['cotacao_id'], dados['fornecedor_id'], float(dados['valor']), dados['prazo_pagamento'], dados['faturamento'])
+        )
         cursor.execute("UPDATE cotacoes SET status = 'Fechada' WHERE id = ? AND status = 'Aberta'", (dados['cotacao_id'],))
         conn.commit()
         return cursor.lastrowid
@@ -212,35 +191,35 @@ def adicionar_orcamento(dados):
         conn.close()
 
 def aprovar_orcamento(orcamento_id, user_id):
-    """Aprova um orçamento, atualiza os status e cria um Pedido de Compra."""
+    """Aprova um orçamento, atualiza status e cria um Pedido de Compra com múltiplos itens."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # 1. Pega os dados do orçamento e da cotação
         orcamento = pd.read_sql('SELECT * FROM orcamentos WHERE id = ?', conn, params=(orcamento_id,)).iloc[0].to_dict()
-        cotacao = pd.read_sql('SELECT * FROM cotacoes WHERE id = ?', conn, params=(orcamento['cotacao_id'],)).iloc[0].to_dict()
-        fornecedor = pd.read_sql('SELECT cnpj FROM fornecedores WHERE id = ?', conn, params=(orcamento['fornecedor_id'],)).iloc[0].to_dict()
-
-        # 2. Marca o orçamento como aprovado
+        cotacao_id = orcamento['cotacao_id']
+        
+        # 1. Marca o orçamento como aprovado e atualiza a cotação
         cursor.execute("UPDATE orcamentos SET aprovado = 1 WHERE id = ?", (orcamento_id,))
+        cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ?", (datetime.now().strftime('%Y-%m-%d'), cotacao_id))
 
-        # 3. Atualiza o status da cotação para Aprovada
-        cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ?", (datetime.now().strftime('%Y-%m-%d'), cotacao['id']))
-
-        # 4. Cria o Pedido de Compra
+        # 2. Cria o cabeçalho do Pedido de Compra
         cursor.execute('''
-            INSERT INTO pedidos_compra (orcamento_id, user_id, item, quantidade, valor, data_abertura, status, fornecedor_cnpj)
-            VALUES (?, ?, ?, ?, ?, ?, 'Aberto', ?)
-        ''', (
-            orcamento_id, user_id, cotacao['item'], cotacao['quantidade'], orcamento['valor'],
-            datetime.now().strftime('%Y-%m-%d'), fornecedor['cnpj']
-        ))
+            INSERT INTO pedidos_compra (cotacao_id, user_id, fornecedor_id, valor_total, data_abertura, status)
+            VALUES (?, ?, ?, ?, ?, 'Aberto')
+        ''', (cotacao_id, user_id, orcamento['fornecedor_id'], orcamento['valor'], datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        pedido_id = cursor.lastrowid
+
+        # 3. Copia os itens da cotação para o pedido
+        itens_cotacao = obter_itens_por_cotacao_id(cotacao_id)
+        itens_pedido = [(pedido_id, item['descricao'], item['quantidade']) for item in itens_cotacao]
+        cursor.executemany('INSERT INTO pedido_itens (pedido_id, descricao, quantidade) VALUES (?, ?, ?)', itens_pedido)
+        
         conn.commit()
-        return True
+        return pedido_id
     except Exception as e:
         conn.rollback()
         print(f"Erro ao aprovar orçamento: {e}")
-        return False
+        return None
     finally:
         conn.close()
 
@@ -258,13 +237,57 @@ def obter_orcamentos_por_cotacao_id(cotacao_id):
     conn.close()
     return df.to_dict('records')
 
+# --- Funções de Pedido de Compra (REESTRUTURADAS) ---
 
-# --- Funções de Dealer Intelligence (Atualizadas) ---
+def obter_pedidos_compra():
+    conn = get_db_connection()
+    query = '''
+        SELECT
+            p.id, p.cotacao_id, p.status, p.data_abertura, p.valor_total,
+            f.nome as fornecedor_nome,
+            (SELECT COUNT(*) FROM pedido_itens pi WHERE pi.pedido_id = p.id) as total_itens
+        FROM pedidos_compra p
+        JOIN fornecedores f ON p.fornecedor_id = f.id
+        ORDER BY p.data_abertura DESC
+    '''
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df.to_dict('records')
 
+def obter_pedido_compra_por_id(pedido_id):
+    conn = get_db_connection()
+    query = '''
+        SELECT p.*, f.nome as fornecedor_nome, f.cnpj as fornecedor_cnpj
+        FROM pedidos_compra p
+        JOIN fornecedores f ON p.fornecedor_id = f.id
+        WHERE p.id = ?
+    '''
+    df = pd.read_sql(query, conn, params=(pedido_id,))
+    return df.iloc[0].to_dict() if not df.empty else None
+
+def obter_itens_por_pedido_id(pedido_id):
+    conn = get_db_connection()
+    df = pd.read_sql("SELECT * FROM pedido_itens WHERE pedido_id = ?", conn, params=(pedido_id,))
+    conn.close()
+    return df.to_dict('records')
+
+def finalizar_pedido_compra(pedido_id, dados):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE pedidos_compra
+            SET status = 'Finalizado', data_finalizacao = ?, nf_e_chave = ?, nfs_pdf_path = ?
+            WHERE id = ? AND status != 'Finalizado'
+        ''', (datetime.now().strftime('%Y-%m-%d'), dados.get('nf_e_chave'), dados.get('nfs_pdf_path'), pedido_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+# --- Funções de Dealer Intelligence (sem alterações) ---
 def obter_dealer_intelligence(data_inicio, data_fim):
     conn = get_db_connection()
-
-    # Query para pegar todos os orçamentos no período
     query_orcamentos = '''
         SELECT c.id as cotacao_id, o.valor
         FROM orcamentos o
@@ -272,48 +295,36 @@ def obter_dealer_intelligence(data_inicio, data_fim):
         WHERE c.data_registro BETWEEN ? AND ?
     '''
     df_orcamentos = pd.read_sql(query_orcamentos, conn, params=(data_inicio, data_fim))
-
-    # Query para pegar apenas os pedidos finalizados (orçamentos aprovados)
     query_pedidos = '''
-        SELECT p.valor, p.data_abertura, p.data_finalizacao, o.cotacao_id
+        SELECT p.valor_total, p.data_abertura, p.data_finalizacao, o.cotacao_id
         FROM pedidos_compra p
-        JOIN orcamentos o ON p.orcamento_id = o.id
+        JOIN orcamentos o ON p.cotacao_id = o.cotacao_id AND o.aprovado = 1
         WHERE p.status = 'Finalizado' AND p.data_abertura BETWEEN ? AND ?
     '''
     df_pedidos = pd.read_sql(query_pedidos, conn, params=(data_inicio, data_fim))
-
     conn.close()
-
-    total_fechado = df_pedidos['valor'].sum() if not df_pedidos.empty else 0
+    total_fechado = df_pedidos['valor_total'].sum() if not df_pedidos.empty else 0
     total_orcado = 0
     valor_poupado = 0
     descontos_perdidos = 0
-
     if not df_orcamentos.empty:
-        # Total orçado é a soma do menor orçamento de cada cotação
         total_orcado = df_orcamentos.groupby('cotacao_id')['valor'].min().sum()
-
-        # Calcula o valor poupado e os descontos perdidos
         for cotacao_id, group in df_orcamentos.groupby('cotacao_id'):
             if cotacao_id in df_pedidos['cotacao_id'].values:
                 menor_valor = group['valor'].min()
-                valor_aprovado = df_pedidos[df_pedidos['cotacao_id'] == cotacao_id]['valor'].iloc[0]
-
-                if valor_aprovado < menor_valor: # Caso de desconto extra
+                valor_aprovado = df_pedidos[df_pedidos['cotacao_id'] == cotacao_id]['valor_total'].iloc[0]
+                if valor_aprovado < menor_valor:
                      valor_poupado += menor_valor - valor_aprovado
                 elif valor_aprovado > menor_valor:
                     descontos_perdidos += valor_aprovado - menor_valor
-
-    # Cálculo do tempo de processamento
     media_dias_processamento = 0
     relatorio_processamento = []
-    if not df_pedidos.empty and 'data_finalizacao' in df_pedidos.columns:
+    if not df_pedidos.empty and 'data_finalizacao' in df_pedidos.columns and pd.notna(df_pedidos['data_finalizacao']).all():
         df_pedidos['data_abertura'] = pd.to_datetime(df_pedidos['data_abertura'])
         df_pedidos['data_finalizacao'] = pd.to_datetime(df_pedidos['data_finalizacao'])
         df_pedidos['dias_processamento'] = (df_pedidos['data_finalizacao'] - df_pedidos['data_abertura']).dt.days
         media_dias_processamento = df_pedidos['dias_processamento'].mean()
         relatorio_processamento = df_pedidos[['data_abertura', 'data_finalizacao', 'dias_processamento']].to_dict('records')
-
     return {
         'total_fechado': total_fechado,
         'total_orcado': total_orcado,
@@ -322,10 +333,9 @@ def obter_dealer_intelligence(data_inicio, data_fim):
         'media_dias_processamento': media_dias_processamento if pd.notna(media_dias_processamento) else 0,
         'relatorio_processamento': relatorio_processamento
     }
-
-
-# --- O resto das funções (usuários, abastecimentos, etc.) permanecem as mesmas ---
-# (O código das outras funções foi omitido para brevidade, mas deve ser mantido como estava)
+    
+# --- Funções de Usuários, Fornecedores e Frotas (sem alterações, omitidas para brevidade) ---
+# ... (cole aqui as outras funções do seu database.py) ...
 
 def get_user_by_username(username):
     conn = get_db_connection()
