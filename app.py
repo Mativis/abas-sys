@@ -200,6 +200,7 @@ def pedidos_relatorio():
     pedidos_list = obter_pedidos_compra()
     return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list)
 
+
 @app.route('/dealers/pedido/<int:pedido_id>', methods=['GET', 'POST'])
 @login_required
 def pedido_detalhe(pedido_id):
@@ -209,18 +210,22 @@ def pedido_detalhe(pedido_id):
         action = request.form.get('action')
         try:
             if action == 'finalizar' and user_role in ['Administrador', 'Comprador', 'Gestor']:
-                # ... (código anterior para obter dados do formulário) ...
+                # --- CORREÇÃO APLICADA AQUI ---
+                chave_nfe = request.form.get('nf_e_chave').strip()
+                nfs_file = request.files.get('nfs_pdf') # A variável é definida aqui, ANTES de ser usada.
+                db_pdf_filename = None
 
-                # --- O AJUSTE ESTÁ AQUI ---
+                if not chave_nfe and not (nfs_file and nfs_file.filename != ''):
+                    flash('Para finalizar, é obrigatório informar a Chave NF-e OU anexar o PDF da NFS.', 'danger')
+                    return redirect(url_for('pedido_detalhe', pedido_id=pedido_id))
+
+                if chave_nfe and len(chave_nfe) not in [44, 54]:
+                    flash('Chave NF-e inválida. Deve ter 44 ou 54 dígitos.', 'danger')
+                    return redirect(url_for('pedido_detalhe', pedido_id=pedido_id))
+                
                 if nfs_file and nfs_file.filename != '' and nfs_file.filename.lower().endswith('.pdf'):
-                    
-                    # 1. Gera um nome de arquivo seguro e único
                     filename = secure_filename(f"nfs_pc{pedido_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf")
-                    
-                    # 2. Salva o arquivo na pasta UPLOAD_FOLDER (ex: /uploads/arquivo.pdf)
                     nfs_file.save(os.path.join(UPLOAD_FOLDER, filename))
-                    
-                    # 3. Armazena apenas o NOME do arquivo no banco de dados para ser usado na URL
                     db_pdf_filename = filename
                 
                 dados = {'nf_e_chave': chave_nfe, 'nfs_pdf_path': db_pdf_filename}
@@ -237,7 +242,6 @@ def pedido_detalhe(pedido_id):
     pedido = obter_pedido_compra_por_id(pedido_id)
     itens = obter_itens_por_pedido_id(pedido_id)
     return render_template('pedido_detalhe.html', active_page='pedidos_compra', pedido=pedido, itens=itens, user_role=user_role)
-
 
 # --- (O resto do arquivo app.py continua aqui, sem alterações) ---
 
