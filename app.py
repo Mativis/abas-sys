@@ -111,42 +111,6 @@ def roles_required(roles):
 
 # --- Rotas de Cotações e Orçamentos ---
 
-@app.route('/dealers/cotacoes-relatorio', methods=['GET', 'POST'])
-@login_required
-def cotacoes_relatorio():
-    if request.method == 'POST':
-        try:
-            dados = {
-                'titulo': request.form['titulo'],
-                'data_limite': request.form['data_limite'],
-                'observacoes': request.form.get('observacoes', ''),
-                'itens': []
-            }
-            descricoes = request.form.getlist('item_descricao[]')
-            quantidades = request.form.getlist('item_quantidade[]')
-            
-            for i in range(len(descricoes)):
-                if descricoes[i] and quantidades[i]:
-                    dados['itens'].append({'descricao': descricoes[i], 'quantidade': quantidades[i]})
-            
-            if not dados['itens']:
-                flash('Você deve adicionar pelo menos um item à cotação.', 'warning')
-                return redirect(url_for('cotacoes_relatorio'))
-
-            cotacao_id = criar_cotacao_com_itens(session['user_id'], dados)
-            
-            if cotacao_id:
-                flash('Cotação criada com sucesso!', 'success')
-                return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
-            else:
-                flash('Erro ao criar cotação.', 'danger')
-        except Exception as e:
-            flash(f'Erro na operação: {str(e)}', 'danger')
-        return redirect(url_for('cotacoes_relatorio'))
-
-    cotacoes_list = obter_cotacoes()
-    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list)
-
 @app.route('/uploads/<path:filename>')
 @login_required
 def serve_upload(filename):
@@ -198,8 +162,43 @@ def cotacao_detalhe(cotacao_id):
 @login_required
 def pedidos_relatorio():
     pedidos_list = obter_pedidos_compra()
-    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list)
+    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list, filtros={})
 
+@app.route('/dealers/cotacoes-relatorio', methods=['GET', 'POST'])
+@login_required
+def cotacoes_relatorio():
+    if request.method == 'POST':
+        try:
+            dados = {
+                'titulo': request.form['titulo'],
+                'data_limite': request.form['data_limite'],
+                'observacoes': request.form.get('observacoes', ''),
+                'itens': []
+            }
+            descricoes = request.form.getlist('item_descricao[]')
+            quantidades = request.form.getlist('item_quantidade[]')
+            
+            for i in range(len(descricoes)):
+                if descricoes[i] and quantidades[i]:
+                    dados['itens'].append({'descricao': descricoes[i], 'quantidade': quantidades[i]})
+            
+            if not dados['itens']:
+                flash('Você deve adicionar pelo menos um item à cotação.', 'warning')
+                return redirect(url_for('cotacoes_relatorio'))
+
+            cotacao_id = criar_cotacao_com_itens(session['user_id'], dados)
+            
+            if cotacao_id:
+                flash('Cotação criada com sucesso!', 'success')
+                return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
+            else:
+                flash('Erro ao criar cotação.', 'danger')
+        except Exception as e:
+            flash(f'Erro na operação: {str(e)}', 'danger')
+        return redirect(url_for('cotacoes_relatorio'))
+
+    cotacoes_list = obter_cotacoes()
+    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list, filtros={})
 
 @app.route('/dealers/pedido/<int:pedido_id>', methods=['GET', 'POST'])
 @login_required
@@ -405,7 +404,7 @@ def pedagios():
     filtros = {'data_inicio': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'), 'data_fim': datetime.now().strftime('%Y-%m-%d'), 'placa': None}
     pedagios_list = obter_pedagios_com_filtros(**filtros)
     return render_template('pedagios.html', active_page='pedagios', pedagios=pedagios_list, filtros=filtros, placas_disponiveis=placas_disponiveis)
-
+    
 @app.route('/dealers/fornecedores', methods=['GET', 'POST'])
 @login_required
 @roles_required(['Administrador', 'Gestor', 'Comprador'])
