@@ -213,21 +213,25 @@ def aprovar_orcamento(orcamento_id, user_id):
         
         # --- LÓGICA DE CORREÇÃO ---
         # 1. Primeiro, redefine o status de TODOS os orçamentos para esta cotação como NÃO aprovado.
-        #    Isso previne que múltiplos orçamentos fiquem com o status de aprovado.
         cursor.execute("UPDATE orcamentos SET aprovado = 0 WHERE cotacao_id = ?", (cotacao_id,))
         
         # 2. Em seguida, marca APENAS o orçamento selecionado como APROVADO.
         cursor.execute("UPDATE orcamentos SET aprovado = 1 WHERE id = ?", (orcamento_id,))
-        # --- FIM DA CORREÇÃO ---
 
-        # 3. Atualiza o status da cotação-mãe para 'Aprovada'
-        cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ?", (datetime.now().strftime('%Y-%m-%d'), cotacao_id))
-
+        # 3. CORREÇÃO: Atualiza o status da cotação-mãe para 'Aprovada' com formato de data consistente
+        data_aprovacao = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("UPDATE cotacoes SET status = 'Aprovada', data_aprovacao = ? WHERE id = ?", 
+                      (data_aprovacao, cotacao_id))
+        
+        # Verifica se a atualização foi bem-sucedida
+        if cursor.rowcount == 0:
+            print(f"AVISO: Nenhuma cotação foi atualizada para ID {cotacao_id}")
+        
         # 4. Cria o Pedido de Compra
         cursor.execute('''
             INSERT INTO pedidos_compra (cotacao_id, user_id, fornecedor_id, valor_total, data_abertura, status)
             VALUES (?, ?, ?, ?, ?, 'Aberto')
-        ''', (cotacao_id, user_id, orcamento['fornecedor_id'], orcamento['valor'], datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        ''', (cotacao_id, user_id, orcamento['fornecedor_id'], orcamento['valor'], data_aprovacao))
         pedido_id = cursor.lastrowid
 
         # 5. Copia os itens da cotação para o pedido
@@ -236,6 +240,7 @@ def aprovar_orcamento(orcamento_id, user_id):
         cursor.executemany('INSERT INTO pedido_itens (pedido_id, descricao, quantidade) VALUES (?, ?, ?)', itens_pedido)
         
         conn.commit()
+        print(f"DEBUG: Cotação {cotacao_id} aprovada com sucesso. Status atualizado para 'Aprovada'")
         return pedido_id
     except Exception as e:
         conn.rollback()
@@ -243,7 +248,7 @@ def aprovar_orcamento(orcamento_id, user_id):
         return None
     finally:
         conn.close()
-    
+
 def obter_orcamentos_por_cotacao_id(cotacao_id):
     """Busca todos os orçamentos de uma cotação específica."""
     conn = get_db_connection()
