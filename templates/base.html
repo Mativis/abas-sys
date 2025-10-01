@@ -3,208 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciamento de Frotas | Eufrates</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>{% block title %}Eufrates - Gerenciamento{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-
     <style>
-        :root {
-            --sidebar-width: 260px;
-            --sidebar-width-collapsed: 80px;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bs-tertiary-bg);
-            transition: padding-left 0.3s;
-        }
-
-        .sidebar {
-            width: var(--sidebar-width);
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background-color: var(--bs-dark);
-            transition: width 0.3s;
-            overflow: hidden;
-            z-index: 1030;
-        }
-        
-        body.sidebar-collapsed .sidebar {
-            width: var(--sidebar-width-collapsed);
-        }
-
-        body.sidebar-collapsed .content {
-            padding-left: var(--sidebar-width-collapsed);
-        }
-
-        .content {
-            padding-left: var(--sidebar-width);
-            width: 100%;
-            transition: padding-left 0.3s;
-        }
-        
-        .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.8);
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1.25rem;
-        }
-
-        .sidebar .nav-link .bi {
-            font-size: 1.25rem;
-            margin-right: 1rem;
-        }
-
-        .sidebar .nav-link .link-text {
-            opacity: 1;
-            transition: opacity 0.1s;
-        }
-
-        body.sidebar-collapsed .sidebar .nav-link .link-text,
-        body.sidebar-collapsed .sidebar .sidebar-title {
-            opacity: 0;
-            width: 0;
-            overflow: hidden;
-        }
-        
-        .sidebar-header {
-            padding: 1.25rem;
-            text-align: center;
-        }
-        
-        .sidebar-title {
-            padding: 10px 15px 5px;
-            font-size: 0.75em;
-            text-transform: uppercase;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.5);
-            margin-top: 10px;
-        }
-        
-        .navbar-top {
-            background-color: var(--bs-body-bg);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-        }
-
-        .page-content {
-            padding: 1.5rem;
-        }
+        :root { --sidebar-width: 280px; }
+        body { display: flex; background-color: var(--bs-tertiary-bg); }
+        .sidebar { width: var(--sidebar-width); height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; background-color: var(--bs-dark); }
+        .main-content { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); }
+        .top-nav { background-color: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); min-height: 60px; }
+        .page-content { overflow-y: auto; padding: 1.5rem; }
+        .sidebar-header { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.7); font-size: 0.95rem; padding: 0.75rem 1.5rem; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { background-color: rgba(255, 255, 255, 0.05); color: #fff; }
+        .sidebar .nav-link .bi { margin-right: 0.75rem; font-size: 1.1rem; }
+        .sidebar .nav-link .arrow { margin-left: auto; transition: transform 0.2s; }
+        .sidebar .nav-link[aria-expanded="true"] .arrow { transform: rotate(90deg); }
+        .sidebar-heading { font-size: .75rem; text-transform: uppercase; letter-spacing: .05rem; font-weight: 600; color: rgba(255, 255, 255, 0.4); padding: 1rem 1.5rem 0.5rem; }
+        .submenu .nav-link { padding-left: 3.5rem; font-size: 0.9rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
     </style>
 </head>
-<body class="sidebar-collapsed">
-
-    <div class="sidebar bg-dark text-white">
-        <div class="sidebar-header">
-            <a href="{{ url_for('index') }}" class="text-white text-decoration-none">
-                <h3 class="mb-0"><i class="bi bi-droplet"></i> <span class="link-text">Eufrates</span></h3>
+<body>
+    <div class="sidebar text-white">
+        <div class="sidebar-header text-center">
+            <a href="{{ url_for('index') }}" class="fs-4 text-white text-decoration-none">
+                <i class="bi bi-droplet-half"></i> Eufrates
             </a>
         </div>
+        
+        <ul class="nav flex-column flex-grow-1 mt-3">
+            <li class="nav-item">
+                <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+                    <i class="bi bi-house-door-fill"></i> Início
+                </a>
+            </li>
 
-        <ul class="nav flex-column">
-            <p class="sidebar-title px-3 pt-3">Menu</p>
+            <div class="sidebar-heading">Frota</div>
             <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'index' }}" href="{{ url_for('index') }}"><i class="bi bi-house"></i><span class="link-text">Início</span></a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#abastecimentoSubmenu" data-bs-toggle="collapse" aria-expanded="false">
-                    <i class="bi bi-fuel-pump"></i><span class="link-text">Abastecimento</span>
+                <a class="nav-link" data-bs-toggle="collapse" href="#frotaSubmenu" role="button" aria-expanded="false" aria-controls="frotaSubmenu">
+                    <i class="bi bi-truck"></i> Módulo Frota <i class="bi bi-chevron-right arrow"></i>
                 </a>
-                <ul class="collapse list-unstyled" id="abastecimentoSubmenu">
-                    <li><a class="nav-link" href="{{ url_for('relatorios') }}">Relatório Abast.</a></li>
-                    <li><a class="nav-link" href="{{ url_for('medias_veiculos') }}">Média KM/L</a></li>
-                    {% if g.user.role in ['Administrador', 'Gestor'] %}
-                    <li><a class="nav-link" href="{{ url_for('reajuste_combustiveis') }}">Combustíveis</a></li>
-                    {% endif %}
-                </ul>
+                <div class="collapse submenu" id="frotaSubmenu">
+                    <ul class="nav flex-column">
+                        <li><a class="nav-link {% if active_page == 'relatorios' %}active{% endif %}" href="{{ url_for('relatorios') }}">Abastecimentos</a></li>
+                        <li><a class="nav-link {% if active_page == 'manutencoes' %}active{% endif %}" href="{{ url_for('manutencoes') }}">Manutenções</a></li>
+                        <li><a class="nav-link {% if active_page == 'medias_veiculos' %}active{% endif %}" href="{{ url_for('medias_veiculos') }}">Média de Veículos</a></li>
+                        <li><a class="nav-link {% if active_page == 'metricas_uso' %}active{% endif %}" href="{{ url_for('metricas_uso') }}">Troca de Óleo</a></li>
+                        <li><a class="nav-link {% if active_page == 'checklists' %}active{% endif %}" href="{{ url_for('checklists') }}">Checklists</a></li>
+                        <li><a class="nav-link {% if active_page == 'pedagios' %}active{% endif %}" href="{{ url_for('pedagios') }}">Pedágios</a></li>
+                        <li><a class="nav-link {% if active_page == 'reajuste_combustiveis' %}active{% endif %}" href="{{ url_for('reajuste_combustiveis') }}">Combustíveis</a></li>
+                    </ul>
+                </div>
             </li>
-            
-            <p class="sidebar-title px-3 pt-3">Dealers</p>
+
+            <div class="sidebar-heading">Dealer</div>
             <li class="nav-item">
-                <a class="nav-link" href="#dealersSubmenu" data-bs-toggle="collapse" aria-expanded="false">
-                    <i class="bi bi-shop"></i><span class="link-text">Dealers</span>
+                <a class="nav-link" data-bs-toggle="collapse" href="#dealerSubmenu" role="button" aria-expanded="false" aria-controls="dealerSubmenu">
+                    <i class="bi bi-building"></i> Módulo Dealer <i class="bi bi-chevron-right arrow"></i>
                 </a>
-                <ul class="collapse list-unstyled" id="dealersSubmenu">
-                    {% if g.user.role in ['Administrador', 'Gestor', 'Comprador'] %}
-                    <li><a class="nav-link" href="{{ url_for('pedidos_relatorio') }}">Pedidos</a></li>
-                    <li><a class="nav-link" href="{{ url_for('cotacoes_relatorio') }}">Cotações</a></li>
-                    <li><a class="nav-link" href="{{ url_for('fornecedores') }}">Fornecedores</a></li>
-                    {% endif %}
-                    {% if g.user.role in ['Administrador', 'Gestor'] %}
-                    <li><a class="nav-link" href="{{ url_for('dealer_intelligence') }}">Intelligence</a></li>
-                    {% endif %}
-                </ul>
+                <div class="collapse submenu" id="dealerSubmenu">
+                    <ul class="nav flex-column">
+                        <li><a class="nav-link {% if active_page == 'cotacoes_relatorio' %}active{% endif %}" href="{{ url_for('cotacoes_relatorio') }}">Cotações</a></li>
+                        <li><a class="nav-link {% if active_page == 'pedidos_relatorio' %}active{% endif %}" href="{{ url_for('pedidos_relatorio') }}">Pedidos</a></li>
+                        <li><a class="nav-link {% if active_page == 'fornecedores' %}active{% endif %}" href="{{ url_for('fornecedores') }}">Fornecedores</a></li>
+                        <li><a class="nav-link {% if active_page == 'dealer_intelligence' %}active{% endif %}" href="{{ url_for('dealer_intelligence') }}">Intelligence</a></li>
+                    </ul>
+                </div>
             </li>
-            
-            {% if g.user.role in ['Administrador', 'Gestor'] %}
-            <p class="sidebar-title px-3 pt-3">Admin</p>
+
+            {% if g.user and g.user.role in ['Administrador', 'Gestor'] %}
+            <div class="sidebar-heading">Admin</div>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('user_management') }}"><i class="bi bi-people"></i><span class="link-text">Usuários</span></a>
+                <a class="nav-link {% if active_page == 'user_management' %}active{% endif %}" href="{{ url_for('user_management') }}">
+                    <i class="bi bi-people-fill"></i> Usuários
+                </a>
             </li>
             {% endif %}
         </ul>
     </div>
-    
-    <div class="content">
-        <nav class="navbar navbar-top navbar-expand-lg sticky-top">
-            <div class="container-fluid">
-                <button class="btn btn-primary" id="sidebarToggle"><i class="bi bi-list"></i></button>
-                <div class="d-flex align-items-center ms-auto">
-                    <div class="form-check form-switch me-3">
-                        <input class="form-check-input" type="checkbox" role="switch" id="themeSwitcher">
-                        <label class="form-check-label" for="themeSwitcher"><i class="bi bi-moon-stars-fill"></i></label>
-                    </div>
-                    <div class="vr"></div>
-                    <div class="user-info mx-3">
-                        <span class="text-secondary"><i class="bi bi-person-circle"></i></span>
-                        {{ g.user.username }} 
-                        <span class="badge 
-                            {% if g.user.role == 'Administrador' or g.user.role == 'Gestor' %}bg-danger
-                            {% elif g.user.role == 'Comprador' %}bg-primary
-                            {% else %}bg-secondary{% endif %}">
-                            {{ g.user.role }}
-                        </span>
-                    </div>
-                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-box-arrow-right"></i> Sair
-                    </a>
-                </div>
+
+    <div class="main-content">
+        <nav class="top-nav px-3 d-flex align-items-center justify-content-end">
+            <div class="form-check form-switch me-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="themeSwitcher">
+                <label class="form-check-label" for="themeSwitcher"><i class="bi bi-moon-stars-fill"></i></label>
             </div>
+            <div class="vr"></div>
+            {% if g.user %}
+                <div class="px-3">
+                    <span class="fw-bold">{{ g.user.username }}</span>
+                    <span class="badge text-bg-secondary">{{ g.user.role }}</span>
+                </div>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">Sair</a>
+            {% endif %}
         </nav>
-        
+
         <main class="page-content">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
                             {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-
+            
             {% block content %}{% endblock %}
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById('sidebarToggle').addEventListener('click', function() {
-            document.body.classList.toggle('sidebar-collapsed');
-        });
-
         const themeSwitcher = document.getElementById('themeSwitcher');
+        const htmlElement = document.documentElement;
+        
         const currentTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-bs-theme', currentTheme);
-        if (currentTheme === 'dark') {
-            themeSwitcher.checked = true;
-        }
+        htmlElement.setAttribute('data-bs-theme', currentTheme);
+        themeSwitcher.checked = currentTheme === 'dark';
+
         themeSwitcher.addEventListener('change', function() {
             const theme = this.checked ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-bs-theme', theme);
+            htmlElement.setAttribute('data-bs-theme', theme);
             localStorage.setItem('theme', theme);
         });
     </script>
