@@ -1,0 +1,82 @@
+<div class="modal fade" id="novaCotacaoModal" tabindex="-1" aria-labelledby="novaCotacaoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="novaCotacaoModalLabel">Criar Nova Cotação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formNovaCotacao" method="POST" action="{{ url_for('cotacoes_relatorio') }}">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="titulo" class="form-label">Título da Cotação <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="titulo" name="titulo" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="data_limite" class="form-label">Data Limite para Orçamentos <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="data_limite" name="data_limite" required>
+                        </div>
+                        <div class="col-12">
+                            <label for="observacoes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="mt-4">Itens da Cotação</h6>
+                    <div id="itens-container">
+                        <div class="row g-2 mb-2 item-row">
+                            <div class="col-md-7">
+                                <input type="text" class="form-control" name="item_descricao[]" placeholder="Descrição do Item" required>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" class="form-control" name="item_quantidade[]" placeholder="Quantidade" min="1" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-danger w-100" onclick="removerItem(this)">Remover</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary mt-2" onclick="adicionarItem()">
+                        <i class="bi bi-plus-circle"></i> Adicionar Item
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Cotação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function adicionarItem() {
+        const container = document.getElementById('itens-container');
+        const novoItem = document.createElement('div');
+        novoItem.classList.add('row', 'g-2', 'mb-2', 'item-row');
+        novoItem.innerHTML = `
+            <div class="col-md-7">
+                <input type="text" class="form-control" name="item_descricao[]" placeholder="Descrição do Item" required>
+            </div>
+            <div class="col-md-3">
+                <input type="number" class="form-control" name="item_quantidade[]" placeholder="Quantidade" min="1" required>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-danger w-100" onclick="removerItem(this)">Remover</button>
+            </div>
+        `;
+        container.appendChild(novoItem);
+    }
+
+    function removerItem(button) {
+        // Garante que pelo menos um item permaneça
+        const container = document.getElementById('itens-container');
+        if (container.children.length > 1) {
+            button.closest('.item-row').remove();
+        } else {
+            alert('É necessário pelo menos um item na cotação.');
+        }
+    }
+</script>

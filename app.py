@@ -114,38 +114,34 @@ def roles_required(roles):
 
 @app.route('/dealers/cotacoes-relatorio', methods=['GET', 'POST'])
 @login_required
+@roles_required(['Administrador', 'Gestor', 'Comprador'])
 def cotacoes_relatorio():
     if request.method == 'POST':
         try:
-            dados = {
-                'titulo': request.form['titulo'],
-                'data_limite': request.form['data_limite'],
-                'observacoes': request.form.get('observacoes', ''),
-                'itens': []
-            }
-            descricoes = request.form.getlist('item_descricao[]')
-            quantidades = request.form.getlist('item_quantidade[]')
+            dados = {'titulo': request.form['titulo'], 'data_limite': request.form['data_limite'],
+                     'observacoes': request.form.get('observacoes', ''), 'itens': []}
             
-            for i in range(len(descricoes)):
-                if descricoes[i] and quantidades[i]:
-                    dados['itens'].append({'descricao': descricoes[i], 'quantidade': quantidades[i]})
+            for desc, quant in zip(request.form.getlist('item_descricao[]'), request.form.getlist('item_quantidade[]')):
+                if desc and quant:
+                    dados['itens'].append({'descricao': desc, 'quantidade': quant})
             
             if not dados['itens']:
-                flash('Você deve adicionar pelo menos um item à cotação.', 'warning')
-                return redirect(url_for('cotacoes_relatorio'))
-
-            cotacao_id = criar_cotacao_com_itens(session['user_id'], dados)
-            
-            if cotacao_id:
-                flash('Cotação criada com sucesso!', 'success')
-                return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
+                flash('Adicione pelo menos um item à cotação.', 'warning')
             else:
-                flash('Erro ao criar cotação.', 'danger')
+                cotacao_id = criar_cotacao_com_itens(session['user_id'], dados)
+                if cotacao_id:
+                    flash('Cotação criada com sucesso!', 'success')
+                    return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
+                else:
+                    flash('Erro ao criar cotação.', 'danger')
         except Exception as e:
             flash(f'Erro na operação: {str(e)}', 'danger')
+        # Redireciona para o método GET para recarregar a lista
         return redirect(url_for('cotacoes_relatorio'))
 
-    # Lógica de Filtros para GET
+    # --- CORREÇÃO PRINCIPAL ---
+    # Esta lógica agora é executada para TODAS as requisições GET (carregamento da página).
+    # Ela pega os filtros da URL (se existirem) e busca os dados no banco.
     filtros = {
         'data_inicio': request.args.get('data_inicio', ''),
         'data_fim': request.args.get('data_fim', ''),
@@ -153,11 +149,10 @@ def cotacoes_relatorio():
         'pesquisa': request.args.get('pesquisa', '')
     }
     
+    # A busca no banco de dados sempre acontece ao carregar a página.
     cotacoes_list = obter_cotacoes_com_filtros(**filtros)
-
-    if request.args.get('imprimir'):
-        return render_template('relatorio_cotacoes_impressao.html', cotacoes=cotacoes_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
-
+    
+    # A variável 'cotacoes' é sempre passada para o template.
     return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list, filtros=filtros)
 
 @app.route('/uploads/<path:filename>')
@@ -609,20 +604,25 @@ def api_excluir_troca_oleo(identificacao, tipo):
 def api_criar_registro():
     try:
         dados = request.get_json()
-        if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel'), dados.get('litros'), dados.get('custo_por_litro')]):
+        if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel')]):
             return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
         
-        litros = float(dados['litros'])
-        custo_por_litro = float(dados['custo_por_litro'])
+        # CORREÇÃO: Converte valores que podem vir vazios para float, tratando como 0.0
+        litros = float(dados.get('litros') or 0)
+        custo_por_litro = float(dados.get('custo_por_litro') or 0)
         desconto = float(dados.get('desconto', 0))
-        custo_bruto = round(litros * custo_por_litro, 2)
-        custo_liquido = round(custo_bruto - desconto, 2)
         
-        dados['custo_bruto'] = custo_bruto
-        dados['custo_liquido'] = custo_liquido
+        # Atribui os valores convertidos de volta ao dicionário
+        dados['litros'] = litros
+        dados['custo_por_litro'] = custo_por_litro
+        dados['desconto'] = desconto
+        dados['custo_bruto'] = round(litros * custo_por_litro, 2)
+        dados['custo_liquido'] = round(dados['custo_bruto'] - desconto, 2)
         
-        id_criado = criar_registro(dados)
-        return jsonify({'success': True, 'id': id_criado})
+        id = criar_registro(dados)
+        return jsonify({'success': True, 'id': id})
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False, 'error': f'Valor numérico inválido: {e}'}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
@@ -631,36 +631,34 @@ def api_criar_registro():
 @roles_required(['Administrador', 'Gestor', 'Comprador', 'Padrão'])
 def gerenciar_registro(id):
     if request.method == 'GET':
-        try:
-            registro = obter_registro_por_id(id)
-            if registro: return jsonify({'success': True, 'data': registro})
-            return jsonify({'success': False, 'error': 'Registro não encontrado'}), 404
-        except Exception as e: return jsonify({'success': False, 'error': str(e)}), 400
-            
+        # ... (sem alterações)
+        registro = obter_registro_por_id(id)
+        if registro: return jsonify({'success': True, 'data': registro})
+        return jsonify({'success': False, 'error': 'Registro não encontrado'}), 404
+
     elif request.method == 'PUT':
         try:
             dados = request.get_json()
-            if not all([dados.get('data'), dados.get('placa'), dados.get('combustivel'), dados.get('litros'), dados.get('custo_por_litro')]):
-                return jsonify({'success': False, 'error': 'Dados obrigatórios faltando.'}), 400
-            
-            litros = float(dados['litros'])
-            custo_por_litro = float(dados['custo_por_litro'])
-            desconto = float(dados.get('desconto', 0))
-            custo_bruto = round(litros * custo_por_litro, 2)
-            custo_liquido = round(custo_bruto - desconto, 2)
-            
-            dados['custo_bruto'] = custo_bruto
-            dados['custo_liquido'] = custo_liquido
-            
-            if atualizar_registro(id, dados): return jsonify({'success': True})
-            return jsonify({'success': False, 'error': 'Nenhum registro atualizado'}), 404
-        except Exception as e: return jsonify({'success': False, 'error': str(e)}), 400
-            
+            # CORREÇÃO: Garante que todos os campos numéricos sejam convertidos para float
+            dados['litros'] = float(dados.get('litros') or 0)
+            dados['custo_por_litro'] = float(dados.get('custo_por_litro') or 0)
+            dados['desconto'] = float(dados.get('desconto', 0))
+            dados['km'] = int(dados.get('km') or 0)
+            dados['custo_bruto'] = round(dados['litros'] * dados['custo_por_litro'], 2)
+            dados['custo_liquido'] = round(dados['custo_bruto'] - dados['desconto'], 2)
+
+            if atualizar_registro(id, dados):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Erro ao atualizar'}), 400
+        except (ValueError, TypeError) as e:
+            return jsonify({'success': False, 'error': f'Valor numérico inválido: {e}'}), 400
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+
     elif request.method == 'DELETE':
-        try:
-            if excluir_registro(id): return jsonify({'success': True})
-            return jsonify({'success': False, 'error': 'Nenhum registro excluído'}), 404
-        except Exception as e: return jsonify({'success': False, 'error': str(e)}), 400
+        # ... (sem alterações)
+        if excluir_registro(id): return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Nenhum registro excluído'}), 404
 
 @app.route('/api/pedagios', methods=['POST'])
 @login_required

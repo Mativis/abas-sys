@@ -40,13 +40,63 @@
                 <div class="row mt-3">
                     <div class="col-12">
                         <button type="submit" class="btn btn-info"><i class="bi bi-search"></i> Filtrar</button>
-                        <button type="submit" name="imprimir" value="true" class="btn btn-secondary"><i class="bi bi-printer"></i> Imprimir</button>
                         <a href="{{ url_for('cotacoes_relatorio') }}" class="btn btn-outline-secondary">Limpar Filtros</a>
                     </div>
                 </div>
             </form>
         </div>
     </div>
-    
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Cotações Registradas</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>Criado por</th>
+                            <th>Data de Criação</th>
+                            <th>Data Limite</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {# CORREÇÃO: Verifica se a lista 'cotacoes' não está vazia antes de iterar #}
+                        {% if cotacoes %}
+                            {% for cotacao in cotacoes %}
+                            <tr>
+                                <td>COT-{{ cotacao.id }}</td>
+                                <td>{{ cotacao.titulo }}</td>
+                                <td>{{ cotacao.criado_por_username }}</td>
+                                <td>{{ cotacao.data_criacao }}</td>
+                                <td>{{ cotacao.data_limite }}</td>
+                                <td>
+                                    <span class="badge {% if cotacao.status == 'Aberta' %}bg-success{% else %}bg-secondary{% endif %}">
+                                        {{ cotacao.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="btn btn-info btn-sm">
+                                        <i class="bi bi-eye"></i> Detalhes
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center">Nenhuma cotação encontrada. Cadastre uma nova para começar.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+</div>
+{% include 'partials/_nova_cotacao_modal.html' %}
 {% endblock %}
