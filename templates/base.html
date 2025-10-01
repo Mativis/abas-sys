@@ -254,10 +254,7 @@
                 let parentCollapse = item.closest('.collapse');
                 if (parentCollapse && (item.classList.contains('active') || currentPath.includes(parentCollapse.id.replace('Submenu', '')))) {
                      new bootstrap.Collapse(parentCollapse, { toggle: false }).show();
-                     const dropdownToggle = item.closest('li.nav-item').querySelector('.dropdown-toggle');
-                     if (dropdownToggle) {
-                        dropdownToggle.classList.add('active');
-                     }
+                     item.closest('li.nav-item').querySelector('.dropdown-toggle').classList.add('active');
                 }
             });
         });

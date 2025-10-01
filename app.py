@@ -68,9 +68,7 @@ from database import (
     obter_pedido_compra_por_id,
     obter_itens_por_pedido_id,
     finalizar_pedido_compra,
-    obter_dealer_intelligence,
-    obter_cotacoes_com_filtros,
-    obter_pedidos_compra_com_filtros
+    obter_dealer_intelligence
 )
 
 
@@ -146,20 +144,8 @@ def cotacoes_relatorio():
             flash(f'Erro na operação: {str(e)}', 'danger')
         return redirect(url_for('cotacoes_relatorio'))
 
-    # Lógica de Filtros para GET
-    filtros = {
-        'data_inicio': request.args.get('data_inicio', ''),
-        'data_fim': request.args.get('data_fim', ''),
-        'status': request.args.get('status', ''),
-        'pesquisa': request.args.get('pesquisa', '')
-    }
-    
-    cotacoes_list = obter_cotacoes_com_filtros(**filtros)
-
-    if request.args.get('imprimir'):
-        return render_template('relatorio_cotacoes_impressao.html', cotacoes=cotacoes_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
-
-    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list, filtros=filtros)
+    cotacoes_list = obter_cotacoes()
+    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list)
 
 @app.route('/uploads/<path:filename>')
 @login_required
@@ -208,21 +194,11 @@ def cotacao_detalhe(cotacao_id):
 
 
 # --- Rotas de Pedidos de Compra ---
-@app.route('/dealers/pedidos-relatorio', methods=['GET'])
+@app.route('/dealers/pedidos-relatorio')
 @login_required
 def pedidos_relatorio():
-    filtros = {
-        'data_inicio': request.args.get('data_inicio', ''),
-        'data_fim': request.args.get('data_fim', ''),
-        'status': request.args.get('status', ''),
-        'pesquisa': request.args.get('pesquisa', '')
-    }
-    pedidos_list = obter_pedidos_compra_com_filtros(**filtros)
-
-    if request.args.get('imprimir'):
-        return render_template('relatorio_pedidos_impressao.html', pedidos=pedidos_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
-        
-    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list, filtros=filtros)
+    pedidos_list = obter_pedidos_compra()
+    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list)
 
 
 @app.route('/dealers/pedido/<int:pedido_id>', methods=['GET', 'POST'])
@@ -234,8 +210,9 @@ def pedido_detalhe(pedido_id):
         action = request.form.get('action')
         try:
             if action == 'finalizar' and user_role in ['Administrador', 'Comprador', 'Gestor']:
+                # --- CORREÇÃO APLICADA AQUI ---
                 chave_nfe = request.form.get('nf_e_chave').strip()
-                nfs_file = request.files.get('nfs_pdf')
+                nfs_file = request.files.get('nfs_pdf') # A variável é definida aqui, ANTES de ser usada.
                 db_pdf_filename = None
 
                 if not chave_nfe and not (nfs_file and nfs_file.filename != ''):
@@ -780,5 +757,4 @@ def inject_now():
     return {'now': datetime.now(), 'g': g}
 
 if __name__ == '__main__':
-    criar_tabelas()
     app.run(debug=True, host='0.0.0.0', port='5005')
