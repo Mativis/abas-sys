@@ -1139,3 +1139,70 @@ def excluir_checklist(id):
         return cursor.rowcount > 0
     finally:
         conn.close()
+
+def obter_cotacoes_com_filtros(data_inicio=None, data_fim=None, status=None, pesquisa=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT c.*, u.username as criado_por_username
+        FROM cotacoes c
+        JOIN users u ON c.criado_por_id = u.id
+        WHERE 1=1
+    """
+    params = []
+    
+    if data_inicio:
+        query += " AND c.data_criacao >= ?"
+        params.append(data_inicio)
+    if data_fim:
+        query += " AND date(c.data_criacao) <= ?"
+        params.append(data_fim)
+    if status:
+        query += " AND c.status = ?"
+        params.append(status)
+    if pesquisa:
+        pesquisa_like = f'%{pesquisa}%'
+        query += " AND (c.titulo LIKE ? OR c.id LIKE ?)"
+        params.extend([pesquisa_like, pesquisa_like])
+        
+    query += " ORDER BY c.id DESC"
+    
+    cursor.execute(query, params)
+    cotacoes = cursor.fetchall()
+    conn.close()
+    return cotacoes
+
+
+def obter_pedidos_compra_com_filtros(data_inicio=None, data_fim=None, status=None, pesquisa=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT pc.*, f.nome as fornecedor_nome
+        FROM pedidos_compra pc
+        JOIN fornecedores f ON pc.fornecedor_id = f.id
+        WHERE 1=1
+    """
+    params = []
+    
+    if data_inicio:
+        query += " AND pc.data_aprovacao >= ?"
+        params.append(data_inicio)
+    if data_fim:
+        query += " AND date(pc.data_aprovacao) <= ?"
+        params.append(data_fim)
+    if status:
+        query += " AND pc.status = ?"
+        params.append(status)
+    if pesquisa:
+        pesquisa_like = f'%{pesquisa}%'
+        query += " AND (pc.id LIKE ? OR pc.cotacao_id LIKE ? OR f.nome LIKE ?)"
+        params.extend([pesquisa_like, pesquisa_like, pesquisa_like])
+        
+    query += " ORDER BY pc.id DESC"
+    
+    cursor.execute(query, params)
+    pedidos = cursor.fetchall()
+    conn.close()
+    return pedidos

@@ -68,9 +68,10 @@ from database import (
     obter_pedido_compra_por_id,
     obter_itens_por_pedido_id,
     finalizar_pedido_compra,
-    obter_dealer_intelligence
+    obter_dealer_intelligence,
+    obter_cotacoes_com_filtros,
+    obter_pedidos_compra_com_filtros
 )
-
 
 app = Flask(__name__)
 app.secret_key = 'sua_chave_secreta_aqui_123'
@@ -144,8 +145,20 @@ def cotacoes_relatorio():
             flash(f'Erro na operação: {str(e)}', 'danger')
         return redirect(url_for('cotacoes_relatorio'))
 
-    cotacoes_list = obter_cotacoes()
-    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list)
+    # Lógica de Filtros para GET
+    filtros = {
+        'data_inicio': request.args.get('data_inicio', ''),
+        'data_fim': request.args.get('data_fim', ''),
+        'status': request.args.get('status', ''),
+        'pesquisa': request.args.get('pesquisa', '')
+    }
+    
+    cotacoes_list = obter_cotacoes_com_filtros(**filtros)
+
+    if request.args.get('imprimir'):
+        return render_template('relatorio_cotacoes_impressao.html', cotacoes=cotacoes_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
+
+    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list, filtros=filtros)
 
 @app.route('/uploads/<path:filename>')
 @login_required
@@ -194,11 +207,21 @@ def cotacao_detalhe(cotacao_id):
 
 
 # --- Rotas de Pedidos de Compra ---
-@app.route('/dealers/pedidos-relatorio')
+@app.route('/dealers/pedidos-relatorio', methods=['GET'])
 @login_required
 def pedidos_relatorio():
-    pedidos_list = obter_pedidos_compra()
-    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list)
+    filtros = {
+        'data_inicio': request.args.get('data_inicio', ''),
+        'data_fim': request.args.get('data_fim', ''),
+        'status': request.args.get('status', ''),
+        'pesquisa': request.args.get('pesquisa', '')
+    }
+    pedidos_list = obter_pedidos_compra_com_filtros(**filtros)
+
+    if request.args.get('imprimir'):
+        return render_template('relatorio_pedidos_impressao.html', pedidos=pedidos_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
+        
+    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list, filtros=filtros)
 
 
 @app.route('/dealers/pedido/<int:pedido_id>', methods=['GET', 'POST'])
@@ -210,9 +233,8 @@ def pedido_detalhe(pedido_id):
         action = request.form.get('action')
         try:
             if action == 'finalizar' and user_role in ['Administrador', 'Comprador', 'Gestor']:
-                # --- CORREÇÃO APLICADA AQUI ---
                 chave_nfe = request.form.get('nf_e_chave').strip()
-                nfs_file = request.files.get('nfs_pdf') # A variável é definida aqui, ANTES de ser usada.
+                nfs_file = request.files.get('nfs_pdf')
                 db_pdf_filename = None
 
                 if not chave_nfe and not (nfs_file and nfs_file.filename != ''):
@@ -243,7 +265,6 @@ def pedido_detalhe(pedido_id):
     itens = obter_itens_por_pedido_id(pedido_id)
     return render_template('pedido_detalhe.html', active_page='pedidos_compra', pedido=pedido, itens=itens, user_role=user_role)
 
-# --- (O resto do arquivo app.py continua aqui, sem alterações) ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -364,7 +385,6 @@ def medias_veiculos():
 def metricas_uso():
     if request.method == 'POST':
         try:
-            # ... (código da rota sem alterações)
             pass
         except Exception as e:
             flash(f'Erro ao salvar dados: {str(e)}', 'danger')
@@ -386,7 +406,6 @@ def metricas_uso():
 def reajuste_combustiveis():
     if request.method == 'POST':
         try:
-            # ... (código da rota sem alterações) ...
             pass
         except Exception as e:
             flash(f'Erro no processamento: {str(e)}', 'danger')
@@ -400,7 +419,6 @@ def reajuste_combustiveis():
 def pedagios():
     placas_disponiveis = obter_placas_veiculos()
     if request.method == 'POST':
-        # ... (código da rota sem alterações) ...
         pass
     filtros = {'data_inicio': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'), 'data_fim': datetime.now().strftime('%Y-%m-%d'), 'placa': None}
     pedagios_list = obter_pedagios_com_filtros(**filtros)
@@ -412,7 +430,6 @@ def pedagios():
 def fornecedores():
     if request.method == 'POST':
         try:
-            # ... (código da rota sem alterações) ...
             pass
         except Exception as e:
             flash(f'Erro ao cadastrar fornecedor: {str(e)}', 'danger')
@@ -443,8 +460,8 @@ def user_management():
     roles = ['Administrador', 'Gestor', 'Comprador', 'Padrão']
     return render_template('user_management.html', active_page='user_management', users=users, roles=roles)
 
-# --- APIs Remanescentes ---
-# ... (APIs sem alterações) ...
+
+# --- APIs ---
 @app.route('/api/dashboard')
 @login_required
 def api_dashboard():
@@ -604,8 +621,8 @@ def api_criar_registro():
         dados['custo_bruto'] = custo_bruto
         dados['custo_liquido'] = custo_liquido
         
-        id = criar_registro(dados)
-        return jsonify({'success': True, 'id': id})
+        id_criado = criar_registro(dados)
+        return jsonify({'success': True, 'id': id_criado})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
@@ -751,10 +768,10 @@ def api_manage_user(user_id):
         else:
             return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
 
-
 @app.context_processor
 def inject_now():
     return {'now': datetime.now(), 'g': g}
 
 if __name__ == '__main__':
+    criar_tabelas()
     app.run(debug=True, host='0.0.0.0', port='5005')
