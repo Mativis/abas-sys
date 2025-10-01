@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Cotações</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { -webkit-print-color-adjust: exact; }
+        }
+        body { font-family: sans-serif; }
+        .container { max-width: 95%; margin: auto; }
+        h1, h2 { text-align: center; }
+        .table { margin-top: 20px; font-size: 0.9em; }
+        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="container mt-4">
+        <h1>Relatório de Cotações</h1>
+        <p class="text-center">Emitido em: {{ data_emissao }}</p>
+
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Título</th>
+                    <th>Criado por</th>
+                    <th>Data de Criação</th>
+                    <th>Data Limite</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cotacao in cotacoes %}
+                <tr>
+                    <td>COT-{{ cotacao.id }}</td>
+                    <td>{{ cotacao.titulo }}</td>
+                    <td>{{ cotacao.criado_por_username }}</td>
+                    <td>{{ cotacao.data_criacao }}</td>
+                    <td>{{ cotacao.data_limite }}</td>
+                    <td>{{ cotacao.status }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">Nenhuma cotação encontrada.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <p>Eufrates - Controle de Frotas</p>
+        </div>
+    </div>
+</body>
+</html>

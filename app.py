@@ -68,7 +68,9 @@ from database import (
     obter_pedido_compra_por_id,
     obter_itens_por_pedido_id,
     finalizar_pedido_compra,
-    obter_dealer_intelligence
+    obter_dealer_intelligence,
+    obter_cotacoes_com_filtros,
+    obter_pedidos_compra_com_filtros
 )
 
 
@@ -110,6 +112,54 @@ def roles_required(roles):
     return wrapper
 
 # --- Rotas de Cotações e Orçamentos ---
+
+@app.route('/dealers/cotacoes-relatorio', methods=['GET', 'POST'])
+@login_required
+def cotacoes_relatorio():
+    if request.method == 'POST':
+        try:
+            dados = {
+                'titulo': request.form['titulo'],
+                'data_limite': request.form['data_limite'],
+                'observacoes': request.form.get('observacoes', ''),
+                'itens': []
+            }
+            descricoes = request.form.getlist('item_descricao[]')
+            quantidades = request.form.getlist('item_quantidade[]')
+            
+            for i in range(len(descricoes)):
+                if descricoes[i] and quantidades[i]:
+                    dados['itens'].append({'descricao': descricoes[i], 'quantidade': quantidades[i]})
+            
+            if not dados['itens']:
+                flash('Você deve adicionar pelo menos um item à cotação.', 'warning')
+                return redirect(url_for('cotacoes_relatorio'))
+
+            cotacao_id = criar_cotacao_com_itens(session['user_id'], dados)
+            
+            if cotacao_id:
+                flash('Cotação criada com sucesso!', 'success')
+                return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
+            else:
+                flash('Erro ao criar cotação.', 'danger')
+        except Exception as e:
+            flash(f'Erro na operação: {str(e)}', 'danger')
+        return redirect(url_for('cotacoes_relatorio'))
+
+    # Lógica de Filtros para GET
+    filtros = {
+        'data_inicio': request.args.get('data_inicio', ''),
+        'data_fim': request.args.get('data_fim', ''),
+        'status': request.args.get('status', ''),
+        'pesquisa': request.args.get('pesquisa', '')
+    }
+    
+    cotacoes_list = obter_cotacoes_com_filtros(**filtros)
+
+    if request.args.get('imprimir'):
+        return render_template('relatorio_cotacoes_impressao.html', cotacoes=cotacoes_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
+
+    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list, filtros=filtros)
 
 @app.route('/uploads/<path:filename>')
 @login_required
@@ -158,47 +208,22 @@ def cotacao_detalhe(cotacao_id):
 
 
 # --- Rotas de Pedidos de Compra ---
-@app.route('/dealers/pedidos-relatorio')
+@app.route('/dealers/pedidos-relatorio', methods=['GET'])
 @login_required
 def pedidos_relatorio():
-    pedidos_list = obter_pedidos_compra()
-    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list, filtros={})
+    filtros = {
+        'data_inicio': request.args.get('data_inicio', ''),
+        'data_fim': request.args.get('data_fim', ''),
+        'status': request.args.get('status', ''),
+        'pesquisa': request.args.get('pesquisa', '')
+    }
+    pedidos_list = obter_pedidos_compra_com_filtros(**filtros)
 
-@app.route('/dealers/cotacoes-relatorio', methods=['GET', 'POST'])
-@login_required
-def cotacoes_relatorio():
-    if request.method == 'POST':
-        try:
-            dados = {
-                'titulo': request.form['titulo'],
-                'data_limite': request.form['data_limite'],
-                'observacoes': request.form.get('observacoes', ''),
-                'itens': []
-            }
-            descricoes = request.form.getlist('item_descricao[]')
-            quantidades = request.form.getlist('item_quantidade[]')
-            
-            for i in range(len(descricoes)):
-                if descricoes[i] and quantidades[i]:
-                    dados['itens'].append({'descricao': descricoes[i], 'quantidade': quantidades[i]})
-            
-            if not dados['itens']:
-                flash('Você deve adicionar pelo menos um item à cotação.', 'warning')
-                return redirect(url_for('cotacoes_relatorio'))
+    if request.args.get('imprimir'):
+        return render_template('relatorio_pedidos_impressao.html', pedidos=pedidos_list, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
+        
+    return render_template('pedidos_relatorio.html', active_page='pedidos_compra', pedidos=pedidos_list, filtros=filtros)
 
-            cotacao_id = criar_cotacao_com_itens(session['user_id'], dados)
-            
-            if cotacao_id:
-                flash('Cotação criada com sucesso!', 'success')
-                return redirect(url_for('cotacao_detalhe', cotacao_id=cotacao_id))
-            else:
-                flash('Erro ao criar cotação.', 'danger')
-        except Exception as e:
-            flash(f'Erro na operação: {str(e)}', 'danger')
-        return redirect(url_for('cotacoes_relatorio'))
-
-    cotacoes_list = obter_cotacoes()
-    return render_template('cotacoes_relatorio.html', active_page='cotacoes', cotacoes=cotacoes_list, filtros={})
 
 @app.route('/dealers/pedido/<int:pedido_id>', methods=['GET', 'POST'])
 @login_required
@@ -209,9 +234,8 @@ def pedido_detalhe(pedido_id):
         action = request.form.get('action')
         try:
             if action == 'finalizar' and user_role in ['Administrador', 'Comprador', 'Gestor']:
-                # --- CORREÇÃO APLICADA AQUI ---
                 chave_nfe = request.form.get('nf_e_chave').strip()
-                nfs_file = request.files.get('nfs_pdf') # A variável é definida aqui, ANTES de ser usada.
+                nfs_file = request.files.get('nfs_pdf')
                 db_pdf_filename = None
 
                 if not chave_nfe and not (nfs_file and nfs_file.filename != ''):
@@ -404,7 +428,7 @@ def pedagios():
     filtros = {'data_inicio': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'), 'data_fim': datetime.now().strftime('%Y-%m-%d'), 'placa': None}
     pedagios_list = obter_pedagios_com_filtros(**filtros)
     return render_template('pedagios.html', active_page='pedagios', pedagios=pedagios_list, filtros=filtros, placas_disponiveis=placas_disponiveis)
-    
+
 @app.route('/dealers/fornecedores', methods=['GET', 'POST'])
 @login_required
 @roles_required(['Administrador', 'Gestor', 'Comprador'])
@@ -756,4 +780,5 @@ def inject_now():
     return {'now': datetime.now(), 'g': g}
 
 if __name__ == '__main__':
+    criar_tabelas()
     app.run(debug=True, host='0.0.0.0', port='5005')

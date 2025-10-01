@@ -7,6 +7,45 @@
 
     <div class="card shadow mb-4">
         <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Filtros e Pesquisa</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('pedidos_relatorio') }}">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">Todos</option>
+                            <option value="Aberto" {% if filtros.status == 'Aberto' %}selected{% endif %}>Aberto</option>
+                            <option value="Finalizado" {% if filtros.status == 'Finalizado' %}selected{% endif %}>Finalizado</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="pesquisa" class="form-label">Pesquisar</label>
+                        <input type="text" class="form-control" id="pesquisa" name="pesquisa" placeholder="ID do Pedido, Cotação ou Fornecedor..." value="{{ filtros.pesquisa }}">
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-info"><i class="bi bi-search"></i> Filtrar</button>
+                        <button type="submit" name="imprimir" value="true" class="btn btn-secondary"><i class="bi bi-printer"></i> Imprimir</button>
+                        <a href="{{ url_for('pedidos_relatorio') }}" class="btn btn-outline-secondary">Limpar Filtros</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">Pedidos de Compra</h6>
         </div>
         <div class="card-body">
@@ -44,7 +83,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="text-center">Nenhum pedido de compra encontrado.</td>
+                            <td colspan="7" class="text-center">Nenhum pedido de compra encontrado com os filtros aplicados.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
