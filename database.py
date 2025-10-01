@@ -1145,18 +1145,22 @@ def obter_cotacoes_com_filtros(data_inicio=None, data_fim=None, status=None, pes
     cursor = conn.cursor()
     
     query = """
-        SELECT c.*, u.username as criado_por_username
+        SELECT 
+            c.id, c.titulo, c.data_limite, c.status, c.data_registro,
+            u.username as solicitante,
+            (SELECT COUNT(*) FROM cotacao_itens ci WHERE ci.cotacao_id = c.id) as total_itens,
+            (SELECT SUM(o.valor) FROM orcamentos o WHERE o.cotacao_id = c.id AND o.aprovado = 1) as valor_aprovado
         FROM cotacoes c
-        JOIN users u ON c.criado_por_id = u.id
+        JOIN users u ON c.user_id = u.id
         WHERE 1=1
     """
     params = []
     
     if data_inicio:
-        query += " AND c.data_criacao >= ?"
+        query += " AND date(c.data_registro) >= ?"
         params.append(data_inicio)
     if data_fim:
-        query += " AND date(c.data_criacao) <= ?"
+        query += " AND date(c.data_registro) <= ?"
         params.append(data_fim)
     if status:
         query += " AND c.status = ?"
@@ -1166,13 +1170,12 @@ def obter_cotacoes_com_filtros(data_inicio=None, data_fim=None, status=None, pes
         query += " AND (c.titulo LIKE ? OR c.id LIKE ?)"
         params.extend([pesquisa_like, pesquisa_like])
         
-    query += " ORDER BY c.id DESC"
+    query += " ORDER BY c.data_registro DESC"
     
     cursor.execute(query, params)
-    cotacoes = cursor.fetchall()
+    cotacoes = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return cotacoes
-
 
 def obter_pedidos_compra_com_filtros(data_inicio=None, data_fim=None, status=None, pesquisa=None):
     conn = get_db_connection()
