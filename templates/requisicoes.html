@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Requisições de Abastecimento{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Requisições de Abastecimento</h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#novaRequisicaoModal">
+        <i class="bi bi-plus-circle-fill me-2"></i> Nova Requisição
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Data</th>
+                        <th>Motorista</th>
+                        <th>Placa</th>
+                        <th>Status</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requisicoes %}
+                    <tr>
+                        <td>REQ-{{ req.id }}</td>
+                        <td>{{ req.data_solicitacao }}</td>
+                        <td>{{ req.motorista or 'N/A' }}</td>
+                        <td><span class="badge text-bg-secondary">{{ req.placa }}</span></td>
+                        <td>
+                            <span class="badge {% if req.status == 'Pendente' %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                                {{ req.status }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('imprimir_requisicao', id=req.id) }}" class="btn btn-sm btn-outline-secondary" title="Imprimir" target="_blank">
+                                <i class="bi bi-printer-fill"></i>
+                            </a>
+                            
+                            {% if req.status == 'Pendente' %}
+                                <a href="{{ url_for('relatorios', requisicao_id=req.id) }}" class="btn btn-sm btn-success" title="Gerar Abastecimento">
+                                    <i class="bi bi-fuel-pump-fill"></i>
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for('relatorios', abastecimento_id=req.abastecimento_id) }}" class="btn btn-sm btn-outline-info" title="Ver Abastecimento">
+                                    <i class="bi bi-eye-fill"></i>
+                                </a>
+                            {% endif %}
+                            
+                            {% if g.user and g.user.role in ['Administrador', 'Gestor'] and req.status == 'Pendente' %}
+                                <button type="button" class="btn btn-sm btn-outline-primary" title="Editar"
+                                        onclick="abrirModalEdicao({{ req.id }})">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <form action="{{ url_for('excluir_requisicao_route', id=req.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir esta requisição?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4">Nenhuma requisição encontrada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="novaRequisicaoModal" tabindex="-1" aria-hidden="true">
+    </div>
+
+<div class="modal fade" id="editarRequisicaoModal" tabindex="-1" aria-labelledby="editarRequisicaoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editarRequisicaoModalLabel">Editar Requisição de Abastecimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formEditarRequisicao" method="POST">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="edit-placa" class="form-label">Placa do Veículo <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="edit-placa" name="placa" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-motorista" class="form-label">Motorista <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="edit-motorista" name="motorista" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-centro_custo" class="form-label">Centro de Custo</label>
+                            <input type="text" class="form-control" id="edit-centro_custo" name="centro_custo">
+                        </div>
+                         <div class="col-md-6">
+                            <label for="edit-combustivel" class="form-label">Combustível</label>
+                            <input type="text" class="form-control" id="edit-combustivel" name="combustivel">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-quantidade_estimada" class="form-label">Qtd. Estimada (Litros)</label>
+                            <input type="number" step="0.01" class="form-control" id="edit-quantidade_estimada" name="quantidade_estimada">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function abrirModalEdicao(id) {
+        // Busca os dados da requisição na API
+        const response = await fetch(`/api/requisicao/${id}`);
+        if (!response.ok) {
+            alert('Erro ao carregar dados da requisição.');
+            return;
+        }
+        const data = await response.json();
+
+        // Preenche o formulário de edição
+        const form = document.getElementById('formEditarRequisicao');
+        form.action = `/requisicao/${id}/editar`;
+        form.querySelector('#edit-placa').value = data.placa;
+        form.querySelector('#edit-motorista').value = data.motorista;
+        form.querySelector('#edit-centro_custo').value = data.centro_custo;
+        form.querySelector('#edit-combustivel').value = data.combustivel;
+        form.querySelector('#edit-quantidade_estimada').value = data.quantidade_estimada;
+        
+        // Abre o modal
+        const modal = new bootstrap.Modal(document.getElementById('editarRequisicaoModal'));
+        modal.show();
+    }
+</script>
+{% endblock %}

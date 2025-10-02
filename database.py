@@ -109,6 +109,23 @@ def criar_tabelas():
         observacoes TEXT, finalizada BOOLEAN DEFAULT 0, prazo_liberacao INTEGER,
         forma_pagamento TEXT, parcelas INTEGER DEFAULT 1, data_registro TEXT DEFAULT CURRENT_TIMESTAMP
     )''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS requisicoes_abastecimento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_solicitacao DATE NOT NULL,
+        solicitado_por_id INTEGER NOT NULL,
+        placa TEXT NOT NULL,
+        motorista TEXT,
+        centro_custo TEXT,
+        combustivel TEXT,
+        quantidade_estimada REAL,
+        status TEXT NOT NULL,
+        abastecimento_id INTEGER,
+        FOREIGN KEY (solicitado_por_id) REFERENCES users(id),
+        FOREIGN KEY (abastecimento_id) REFERENCES abastecimentos(id)
+    )
+''')
+
     
     conn.commit()
     conn.close()
@@ -1214,3 +1231,87 @@ def obter_pedidos_compra_com_filtros(data_inicio=None, data_fim=None, status=Non
     pedidos = cursor.fetchall()
     conn.close()
     return pedidos
+
+# Adicione estas funções no final de database.py
+
+def criar_requisicao(dados):
+    """Cria uma nova requisição de abastecimento."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO requisicoes_abastecimento (data_solicitacao, solicitado_por_id, placa, motorista, centro_custo, combustivel, quantidade_estimada, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        dados['data_solicitacao'], dados['solicitado_por_id'], dados['placa'],
+        dados.get('motorista'), dados.get('centro_custo'), dados.get('combustivel'),
+        dados.get('quantidade_estimada'), 'Pendente'
+    ))
+    conn.commit()
+    id_requisicao = cursor.lastrowid
+    conn.close()
+    return id_requisicao
+
+
+def obter_todas_requisicoes():
+    """Busca todas as requisições, juntando o nome do solicitante."""
+    conn = get_db_connection()
+    requisicoes = conn.execute("""
+        SELECT r.*, u.username as solicitado_por_nome
+        FROM requisicoes_abastecimento r
+        JOIN users u ON r.solicitado_por_id = u.id
+        ORDER BY r.data_solicitacao DESC, r.id DESC
+    """).fetchall()
+    conn.close()
+    return requisicoes
+
+def obter_requisicoes_pendentes():
+    """Busca apenas as requisições com status 'Pendente'."""
+    conn = get_db_connection()
+    requisicoes = conn.execute("SELECT * FROM requisicoes_abastecimento WHERE status = 'Pendente' ORDER BY id DESC").fetchall()
+    conn.close()
+    return requisicoes
+
+def obter_requisicao_por_id(id):
+    """Busca uma requisição específica pelo ID, juntando o nome do solicitante."""
+    conn = get_db_connection()
+    requisicao = conn.execute("""
+        SELECT r.*, u.username as solicitado_por_nome
+        FROM requisicoes_abastecimento r
+        JOIN users u ON r.solicitado_por_id = u.id
+        WHERE r.id = ?
+    """, (id,)).fetchone()
+    conn.close()
+    return requisicao
+
+def concluir_requisicao(requisicao_id, abastecimento_id):
+    """Muda o status de uma requisição para 'Concluído' e a vincula a um abastecimento."""
+    conn = get_db_connection()
+    conn.execute("UPDATE requisicoes_abastecimento SET status = 'Concluído', abastecimento_id = ? WHERE id = ?", (abastecimento_id, requisicao_id))
+    conn.commit()
+    conn.close()
+
+def atualizar_requisicao(id, dados):
+    """Atualiza uma requisição de abastecimento existente."""
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE requisicoes_abastecimento
+        SET placa = ?, motorista = ?, centro_custo = ?, combustivel = ?, quantidade_estimada = ?
+        WHERE id = ? AND status = 'Pendente'
+    """, (
+        dados['placa'], dados.get('motorista'), dados.get('centro_custo'),
+        dados.get('combustivel'), dados.get('quantidade_estimada'), id
+    ))
+    conn.commit()
+    rows_updated = conn.total_changes
+    conn.close()
+    return rows_updated > 0
+
+def excluir_requisicao(id):
+    """Exclui uma requisição de abastecimento se ela estiver pendente."""
+    conn = get_db_connection()
+    # Apenas requisições com status 'Pendente' podem ser excluídas
+    conn.execute("DELETE FROM requisicoes_abastecimento WHERE id = ? AND status = 'Pendente'", (id,))
+    conn.commit()
+    rows_deleted = conn.total_changes
+    conn.close()
+    return rows_deleted > 0    

@@ -17,6 +17,14 @@ from database import (
     criar_tabelas,
     obter_relatorio,
     calcular_medias_veiculos,
+    criar_requisicao,
+    obter_todas_requisicoes,
+    obter_requisicoes_pendentes,
+    obter_requisicao_por_id,
+    concluir_requisicao,
+    atualizar_requisicao,
+    excluir_requisicao,
+    obter_requisicao_por_id,
     obter_precos_combustivel,
     atualizar_preco_combustivel,
     criar_combustivel,
@@ -323,26 +331,56 @@ def index():
 @app.route('/relatorios', methods=['GET', 'POST'])
 @login_required
 def relatorios():
-    precos_combustivel = obter_precos_combustivel()
+    requisicao_para_abastecer = None
+    requisicao_id = request.args.get('requisicao_id', type=int)
+    if requisicao_id:
+        # Busca o objeto do banco de dados
+        requisicao_obj = obter_requisicao_por_id(requisicao_id)
+        if requisicao_obj:
+            # --- A CORREÇÃO ESTÁ AQUI ---
+            # Converte o objeto 'Row' para um dicionário padrão do Python
+            requisicao_para_abastecer = dict(requisicao_obj)
+    
+    # O restante da sua função continua exatamente igual...
+    filtros = {}
     if request.method == 'POST':
         filtros = {
-            'data_inicio': request.form.get('data_inicio', '2025-01-01'),
-            'data_fim': request.form.get('data_fim', datetime.now().strftime('%Y-%m-%d')),
+            'data_inicio': request.form.get('data_inicio'),
+            'data_fim': request.form.get('data_fim'),
             'placa': request.form.get('placa', '').strip() or None,
             'centro_custo': request.form.get('centro_custo', '').strip() or None,
             'combustivel': request.form.get('combustivel', '').strip() or None,
             'posto': request.form.get('posto', '').strip() or None
         }
-        try:
-            df = obter_relatorio(**filtros)
-            if request.form.get('imprimir'):
-                return render_template('relatorio_impressao.html', dados=df.to_dict('records'), filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
-            return render_template('relatorios.html', dados=df.to_dict('records'), filtros=filtros, opcoes_centro_custo=obter_opcoes_filtro('centro_custo'), opcoes_combustivel=obter_opcoes_filtro('combustivel'), opcoes_posto=obter_opcoes_filtro('posto'), precos_combustivel=precos_combustivel, active_page='relatorios')
-        except Exception as e:
-            flash(f'Erro ao gerar relatório: {str(e)}', 'danger')
-            return render_template('relatorios.html', filtros={'data_inicio': '2025-01-01', 'data_fim': datetime.now().strftime('%Y-%m-%d')}, opcoes_centro_custo=obter_opcoes_filtro('centro_custo'), opcoes_combustivel=obter_opcoes_filtro('combustivel'), opcoes_posto=obter_opcoes_filtro('posto'), precos_combustivel=obter_precos_combustivel(), active_page='relatorios')
+    else: # GET
+        filtros = {
+            'data_inicio': request.args.get('data_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')),
+            'data_fim': request.args.get('data_fim', datetime.now().strftime('%Y-%m-%d')),
+            'placa': request.args.get('placa', '').strip() or None
+        }
+
+    try:
+        df = obter_relatorio(**filtros)
+        dados = df.to_dict('records')
+        if request.values.get('imprimir'):
+            return render_template('relatorio_impressao.html', dados=dados, filtros=filtros, data_emissao=datetime.now().strftime('%d/%m/%Y %H:%M'))
+    except Exception as e:
+        flash(f'Erro ao gerar relatório: {str(e)}', 'danger')
+        dados = []
+
+    filtros_para_template = {k: (v or '') for k, v in filtros.items()}
     
-    return render_template('relatorios.html', filtros={'data_inicio': '2025-01-01', 'data_fim': datetime.now().strftime('%Y-%m-%d')}, opcoes_centro_custo=obter_opcoes_filtro('centro_custo'), opcoes_combustivel=obter_opcoes_filtro('combustivel'), opcoes_posto=obter_opcoes_filtro('posto'), precos_combustivel=obter_precos_combustivel(), active_page='relatorios')
+    return render_template(
+        'relatorios.html',
+        dados=dados,
+        filtros=filtros_para_template,
+        opcoes_centro_custo=obter_opcoes_filtro('centro_custo'),
+        opcoes_combustivel=obter_opcoes_filtro('combustivel'),
+        opcoes_posto=obter_opcoes_filtro('posto'),
+        precos_combustivel=obter_precos_combustivel(),
+        active_page='relatorios',
+        requisicao_para_abastecer=requisicao_para_abastecer
+    )
 
 @app.route('/manutencoes')
 @login_required
@@ -418,6 +456,38 @@ def pedagios():
     filtros = {'data_inicio': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'), 'data_fim': datetime.now().strftime('%Y-%m-%d'), 'placa': None}
     pedagios_list = obter_pedagios_com_filtros(**filtros)
     return render_template('pedagios.html', active_page='pedagios', pedagios=pedagios_list, filtros=filtros, placas_disponiveis=placas_disponiveis)
+
+@app.route('/requisicoes', methods=['GET', 'POST'])
+@login_required
+def requisicoes():
+    if request.method == 'POST':
+        try:
+            dados = {
+                'data_solicitacao': datetime.now().strftime('%Y-%m-%d'),
+                'solicitado_por_id': session['user_id'],
+                'placa': request.form['placa'],
+                'motorista': request.form.get('motorista'),
+                'centro_custo': request.form.get('centro_custo'),
+                'combustivel': request.form.get('combustivel'),
+                'quantidade_estimada': request.form.get('quantidade_estimada')
+            }
+            criar_requisicao(dados)
+            flash('Requisição de abastecimento criada com sucesso!', 'success')
+        except Exception as e:
+            flash(f'Erro ao criar requisição: {str(e)}', 'danger')
+        return redirect(url_for('requisicoes'))
+
+    requisicoes_list = obter_todas_requisicoes()
+    return render_template('requisicoes.html', active_page='requisicoes', requisicoes=requisicoes_list)
+
+@app.route('/requisicao/<int:id>/imprimir')
+@login_required
+def imprimir_requisicao(id):
+    requisicao = obter_requisicao_por_id(id)
+    if not requisicao:
+        flash('Requisição não encontrada.', 'danger')
+        return redirect(url_for('requisicoes'))
+    return render_template('requisicao_impressao.html', requisicao=requisicao)    
 
 @app.route('/dealers/fornecedores', methods=['GET', 'POST'])
 @login_required
@@ -505,6 +575,43 @@ def api_manutencoes():
             else: return jsonify({'success': False, 'error': 'Erro ao criar manutenção'}), 400
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/requisicao/<int:id>')
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def api_obter_requisicao(id):
+    """API para buscar os dados de uma requisição para o modal de edição."""
+    requisicao = obter_requisicao_por_id(id)
+    if requisicao:
+        return jsonify(dict(requisicao))
+    return jsonify({'error': 'Requisição não encontrada'}), 404
+
+@app.route('/requisicao/<int:id>/editar', methods=['POST'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def editar_requisicao(id):
+    try:
+        dados = request.form.to_dict()
+        if atualizar_requisicao(id, dados):
+            flash('Requisição atualizada com sucesso!', 'success')
+        else:
+            flash('Erro ao atualizar. A requisição pode não estar mais pendente.', 'danger')
+    except Exception as e:
+        flash(f'Ocorreu um erro inesperado: {str(e)}', 'danger')
+    return redirect(url_for('requisicoes'))
+
+@app.route('/requisicao/<int:id>/excluir', methods=['POST'])
+@login_required
+@roles_required(['Administrador', 'Gestor'])
+def excluir_requisicao_route(id):
+    try:
+        if excluir_requisicao(id):
+            flash('Requisição excluída com sucesso.', 'success')
+        else:
+            flash('Erro ao excluir. A requisição pode já ter sido concluída.', 'warning')
+    except Exception as e:
+        flash(f'Ocorreu um erro inesperado: {str(e)}', 'danger')
+    return redirect(url_for('requisicoes'))            
 
 @app.route('/api/manutencoes/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @login_required
