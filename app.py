@@ -332,16 +332,13 @@ def index():
 @login_required
 def relatorios():
     requisicao_para_abastecer = None
+    # --- NOVA LÓGICA ---
+    # Verifica se a página foi chamada a partir de um botão "Gerar Abastecimento"
     requisicao_id = request.args.get('requisicao_id', type=int)
     if requisicao_id:
-        # Busca o objeto do banco de dados
-        requisicao_obj = obter_requisicao_por_id(requisicao_id)
-        if requisicao_obj:
-            # --- A CORREÇÃO ESTÁ AQUI ---
-            # Converte o objeto 'Row' para um dicionário padrão do Python
-            requisicao_para_abastecer = dict(requisicao_obj)
-    
-    # O restante da sua função continua exatamente igual...
+        requisicao_para_abastecer = obter_requisicao_por_id(requisicao_id)
+    # --- FIM DA NOVA LÓGICA ---
+
     filtros = {}
     if request.method == 'POST':
         filtros = {
@@ -369,7 +366,7 @@ def relatorios():
         dados = []
 
     filtros_para_template = {k: (v or '') for k, v in filtros.items()}
-    
+
     return render_template(
         'relatorios.html',
         dados=dados,
@@ -379,7 +376,7 @@ def relatorios():
         opcoes_posto=obter_opcoes_filtro('posto'),
         precos_combustivel=obter_precos_combustivel(),
         active_page='relatorios',
-        requisicao_para_abastecer=requisicao_para_abastecer
+        requisicao_para_abastecer=requisicao_para_abastecer  # Envia os dados da requisição para o template
     )
 
 @app.route('/manutencoes')
