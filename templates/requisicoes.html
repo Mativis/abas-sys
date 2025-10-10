@@ -74,9 +74,46 @@
     </div>
 </div>
 
-<div class="modal fade" id="novaRequisicaoModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="novaRequisicaoModal" tabindex="-1" aria-labelledby="novaRequisicaoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="novaRequisicaoModalLabel">Nova Requisição de Abastecimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('frota.requisicoes') }}">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="nova-placa" class="form-label">Placa do Veículo <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="nova-placa" name="placa" required placeholder="ABC1D23">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nova-motorista" class="form-label">Motorista <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="nova-motorista" name="motorista" required placeholder="Nome do motorista">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nova-centro_custo" class="form-label">Centro de Custo</label>
+                            <input type="text" class="form-control" id="nova-centro_custo" name="centro_custo" placeholder="Ex: OBRAS/DIRETORIA">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nova-combustivel" class="form-label">Combustível</label>
+                            <input type="text" class="form-control" id="nova-combustivel" name="combustivel" placeholder="Ex: GASOLINA/DIESEL S10">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nova-quantidade_estimada" class="form-label">Qtd. Estimada (Litros)</label>
+                            <input type="number" step="0.01" class="form-control" id="nova-quantidade_estimada" name="quantidade_estimada" placeholder="Ex: 50.00">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Solicitar Abastecimento</button>
+                </div>
+            </form>
+        </div>
     </div>
-
+</div>
 <div class="modal fade" id="editarRequisicaoModal" tabindex="-1" aria-labelledby="editarRequisicaoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
