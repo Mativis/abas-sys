@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <a href="{{ url_for('pedidos_relatorio') }}" class="btn btn-outline-secondary btn-sm mb-3">
+    <a href="{{ url_for('dealer.pedidos_relatorio') }}" class="btn btn-outline-secondary btn-sm mb-3">
         <i class="bi bi-arrow-left"></i> Voltar para o Relatório
     </a>
 
@@ -14,7 +14,7 @@
             <div class="row mb-3">
                  <div class="col-md-3"><strong>Fornecedor:</strong><p>{{ pedido.fornecedor_nome or 'N/A' }}</p></div>
                  <div class="col-md-3"><strong>CNPJ:</strong><p>{{ pedido.fornecedor_cnpj or 'N/A' }}</p></div>
-                 <div class="col-md-3"><strong>Cotação Gênesis:</strong><p><a href="{{ url_for('cotacao_detalhe', cotacao_id=pedido.cotacao_id) }}">Cotação #{{ pedido.cotacao_id }}</a></p></div>
+                 <div class="col-md-3"><strong>Cotação Gênesis:</strong><p><a href="{{ url_for('dealer.cotacao_detalhe', cotacao_id=pedido.cotacao_id) }}">Cotação #{{ pedido.cotacao_id }}</a></p></div>
                  <div class="col-md-3"><strong>Valor Total:</strong><p class="fw-bold">R$ {{ "%.2f"|format(pedido.valor_total) }}</p></div>
             </div>
 
@@ -43,7 +43,7 @@
                     <p><strong>Chave NF-e:</strong> {{ pedido.nf_e_chave or '-' }}</p>
                     <p><strong>Anexo NFS:</strong> 
                         {% if pedido.nfs_pdf_path %}
-                        <a href="{{ url_for('serve_upload', filename=pedido.nfs_pdf_path) }}" target="_blank">Visualizar PDF</a>
+                        <a href="{{ url_for('frota.serve_upload', filename=pedido.nfs_pdf_path) }}" target="_blank">Visualizar PDF</a>
                         {% else %}-{% endif %}
                     </p>
                 </div>
@@ -59,7 +59,7 @@
                 <h5 class="modal-title">Finalizar Pedido: PC-{{ pedido.id }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('pedido_detalhe', pedido_id=pedido.id) }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('dealer.pedido_detalhe', pedido_id=pedido.id) }}" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="finalizar">
                 <div class="modal-body">
                     <div class="alert alert-warning">

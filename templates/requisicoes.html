@@ -36,16 +36,16 @@
                             </span>
                         </td>
                         <td class="text-end">
-                            <a href="{{ url_for('imprimir_requisicao', id=req.id) }}" class="btn btn-sm btn-outline-secondary" title="Imprimir" target="_blank">
+                            <a href="{{ url_for('frota.imprimir_requisicao', id=req.id) }}" class="btn btn-sm btn-outline-secondary" title="Imprimir" target="_blank">
                                 <i class="bi bi-printer-fill"></i>
                             </a>
                             
                             {% if req.status == 'Pendente' %}
-                                <a href="{{ url_for('relatorios', requisicao_id=req.id) }}" class="btn btn-sm btn-success" title="Gerar Abastecimento">
+                                <a href="{{ url_for('frota.relatorios', requisicao_id=req.id) }}" class="btn btn-sm btn-success" title="Gerar Abastecimento">
                                     <i class="bi bi-fuel-pump-fill"></i>
                                 </a>
                             {% else %}
-                                <a href="{{ url_for('relatorios', abastecimento_id=req.abastecimento_id) }}" class="btn btn-sm btn-outline-info" title="Ver Abastecimento">
+                                <a href="{{ url_for('frota.relatorios', abastecimento_id=req.abastecimento_id) }}" class="btn btn-sm btn-outline-info" title="Ver Abastecimento">
                                     <i class="bi bi-eye-fill"></i>
                                 </a>
                             {% endif %}
@@ -55,7 +55,7 @@
                                         onclick="abrirModalEdicao({{ req.id }})">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
-                                <form action="{{ url_for('excluir_requisicao_route', id=req.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir esta requisição?');">
+                                <form action="{{ url_for('frota.excluir_requisicao_route', id=req.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir esta requisição?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
@@ -130,7 +130,8 @@
 
         // Preenche o formulário de edição
         const form = document.getElementById('formEditarRequisicao');
-        form.action = `/requisicao/${id}/editar`;
+        // Atualiza a action do formulário usando a rota correta do Blueprint
+        form.action = `{{ url_for('frota.editar_requisicao', id=0) }}`.replace('/0/editar', `/${data.id}/editar`);
         form.querySelector('#edit-placa').value = data.placa;
         form.querySelector('#edit-motorista').value = data.motorista;
         form.querySelector('#edit-centro_custo').value = data.centro_custo;

@@ -11,7 +11,7 @@
         </button>
     </div>
     <div class="card-body">
-        <form method="POST" action="/pedagios" class="row g-3 mb-4">
+        <form method="POST" action="{{ url_for('frota.pedagios') }}" class="row g-3 mb-4">
             <div class="col-md-3">
                 <label class="form-label">Data Início</label>
                 <input type="date" class="form-control" name="data_inicio" 
@@ -375,4 +375,3 @@ function showAlert(message, type) {
     }, 5000);
 }
 </script>
-{% endblock %}

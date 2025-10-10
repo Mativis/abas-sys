@@ -134,14 +134,14 @@
 
     <div class="sidebar text-white">
         <div class="sidebar-header text-center">
-            <a href="{{ url_for('index') }}" class="fs-4 text-white text-decoration-none">
+            <a href="{{ url_for('frota.index') }}" class="fs-4 text-white text-decoration-none">
                 <i class="bi bi-droplet-half"></i> Eufrates
             </a>
         </div>
         
         <ul class="nav flex-column flex-grow-1 mt-3">
             <li class="nav-item">
-                <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+                <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="{{ url_for('frota.index') }}">
                     <i class="bi bi-house-door-fill"></i> Início
                 </a>
             </li>
@@ -153,11 +153,11 @@
                 </a>
                 <div class="collapse submenu" id="frotaSubmenu">
                     <ul class="nav flex-column">
-                        <li><a class="nav-link {% if active_page == 'requisicoes' %}active{% endif %}" href="{{ url_for('requisicoes') }}">Requisições</a></li>
-                        <li><a class="nav-link {% if active_page == 'relatorios' %}active{% endif %}" href="{{ url_for('relatorios') }}">Abastecimentos</a></li>
-                        <li><a class="nav-link {% if active_page == 'manutencoes' %}active{% endif %}" href="{{ url_for('manutencoes') }}">Manutenções</a></li>
-                        <li><a class="nav-link {% if active_page == 'medias_veiculos' %}active{% endif %}" href="{{ url_for('medias_veiculos') }}">Média de Veículos</a></li>
-                        <li><a class="nav-link {% if active_page == 'metricas_uso' %}active{% endif %}" href="{{ url_for('metricas_uso') }}">Troca de Óleo</a></li>
+                        <li><a class="nav-link {% if active_page == 'requisicoes' %}active{% endif %}" href="{{ url_for('frota.requisicoes') }}">Requisições</a></li>
+                        <li><a class="nav-link {% if active_page == 'relatorios' %}active{% endif %}" href="{{ url_for('frota.relatorios') }}">Abastecimentos</a></li>
+                        <li><a class="nav-link {% if active_page == 'manutencoes' %}active{% endif %}" href="{{ url_for('frota.manutencoes') }}">Manutenções</a></li>
+                        <li><a class="nav-link {% if active_page == 'medias_veiculos' %}active{% endif %}" href="{{ url_for('frota.medias_veiculos') }}">Média de Veículos</a></li>
+                        <li><a class="nav-link {% if active_page == 'metricas_uso' %}active{% endif %}" href="{{ url_for('frota.metricas_uso') }}">Troca de Óleo</a></li>
                     </ul>
                 </div>
             </li>
@@ -169,9 +169,9 @@
                 </a>
                 <div class="collapse submenu" id="dealerSubmenu">
                     <ul class="nav flex-column">
-                        <li><a class="nav-link {% if active_page == 'cotacoes_relatorio' %}active{% endif %}" href="{{ url_for('cotacoes_relatorio') }}">Cotações</a></li>
-                        <li><a class="nav-link {% if active_page == 'pedidos_relatorio' %}active{% endif %}" href="{{ url_for('pedidos_relatorio') }}">Pedidos</a></li>
-                        <li><a class="nav-link {% if active_page == 'fornecedores' %}active{% endif %}" href="{{ url_for('fornecedores') }}">Fornecedores</a></li>
+                        <li><a class="nav-link {% if active_page == 'cotacoes_relatorio' %}active{% endif %}" href="{{ url_for('dealer.cotacoes_relatorio') }}">Cotações</a></li>
+                        <li><a class="nav-link {% if active_page == 'pedidos_relatorio' %}active{% endif %}" href="{{ url_for('dealer.pedidos_relatorio') }}">Pedidos</a></li>
+                        <li><a class="nav-link {% if active_page == 'fornecedores' %}active{% endif %}" href="{{ url_for('dealer.fornecedores') }}">Fornecedores</a></li>
                     </ul>
                 </div>
             </li>
@@ -179,12 +179,12 @@
             {% if g.user and g.user.role in ['Administrador', 'Gestor'] %}
             <div class="sidebar-heading">Admin</div>
             <li class="nav-item">
-                <a class="nav-link {% if active_page == 'user_management' %}active{% endif %}" href="{{ url_for('user_management') }}">
+                <a class="nav-link {% if active_page == 'user_management' %}active{% endif %}" href="{{ url_for('auth.user_management') }}">
                     <i class="bi bi-people-fill"></i> Usuários
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_page == 'reajuste_combustiveis' %}active{% endif %}" href="{{ url_for('reajuste_combustiveis') }}">
+                <a class="nav-link {% if active_page == 'reajuste_combustiveis' %}active{% endif %}" href="{{ url_for('frota.reajuste_combustiveis') }}">
                     <i class="bi bi-currency-dollar"></i> Preços
                 </a>
             </li>
@@ -204,7 +204,7 @@
                     <span class="fw-bold">{{ g.user.username }}</span>
                     <span class="badge text-bg-secondary">{{ g.user.role }}</span>
                 </div>
-                <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">Sair</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm">Sair</a>
             {% endif %}
         </nav>
         <main class="page-content">

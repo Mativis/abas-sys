@@ -14,7 +14,7 @@
             <h6 class="m-0 font-weight-bold text-primary">Filtros e Pesquisa</h6>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ url_for('cotacoes_relatorio') }}">
+            <form method="GET" action="{{ url_for('dealer.cotacoes_relatorio') }}">
                 <div class="row g-3">
                     <div class="col-md-3">
                         <label for="data_inicio" class="form-label">Data Início</label>
@@ -40,7 +40,7 @@
                 <div class="row mt-3">
                     <div class="col-12">
                         <button type="submit" class="btn btn-info"><i class="bi bi-search"></i> Filtrar</button>
-                        <a href="{{ url_for('cotacoes_relatorio') }}" class="btn btn-outline-secondary">Limpar Filtros</a>
+                        <a href="{{ url_for('dealer.cotacoes_relatorio') }}" class="btn btn-outline-secondary">Limpar Filtros</a>
                     </div>
                 </div>
             </form>
@@ -72,8 +72,8 @@
                             <tr>
                                 <td>COT-{{ cotacao.id }}</td>
                                 <td>{{ cotacao.titulo }}</td>
-                                <td>{{ cotacao.criado_por_username }}</td>
-                                <td>{{ cotacao.data_criacao }}</td>
+                                <td>{{ cotacao.solicitante }}</td>
+                                <td>{{ cotacao.data_registro }}</td>
                                 <td>{{ cotacao.data_limite }}</td>
                                 <td>
                                     <span class="badge {% if cotacao.status == 'Aberta' %}bg-success{% else %}bg-secondary{% endif %}">
@@ -81,7 +81,7 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="btn btn-info btn-sm">
+                                    <a href="{{ url_for('dealer.cotacao_detalhe', cotacao_id=cotacao.id) }}" class="btn btn-info btn-sm">
                                         <i class="bi bi-eye"></i> Detalhes
                                     </a>
                                 </td>

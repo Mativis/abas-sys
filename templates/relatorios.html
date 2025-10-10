@@ -11,7 +11,7 @@
         </button>
     </div>
     <div class="card-body">
-        <form method="POST" action="/relatorios" class="row g-3 mb-4">
+        <form method="POST" action="{{ url_for('frota.relatorios') }}" class="row g-3 mb-4">
             <div class="col-md-3">
                 <label class="form-label">Data Início</label>
                 <input type="date" class="form-control" name="data_inicio" 
@@ -195,7 +195,6 @@
     </div>
 </div>
 
-<!-- Modal Novo Registro -->
 <div class="modal fade" id="novoRegistroModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -291,7 +290,6 @@
     </div>
 </div>
 
-<!-- Modal Edição -->
 <div class="modal fade" id="editarModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -300,8 +298,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="formEdicao">
+                <input type="hidden" id="editar_id">
                 <div class="modal-body">
-                    <input type="hidden" id="editar_id">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Data *</label>
@@ -385,7 +383,6 @@
     </div>
 </div>
 
-<!-- Modal Detalhes -->
 <div class="modal fade" id="detalhesModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -394,8 +391,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="detalhesConteudo">
-                <!-- Conteúdo será preenchido via JavaScript -->
-            </div>
+                </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>

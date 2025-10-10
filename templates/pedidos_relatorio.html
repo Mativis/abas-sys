@@ -10,7 +10,7 @@
             <h6 class="m-0 font-weight-bold text-primary">Filtros e Pesquisa</h6>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ url_for('pedidos_relatorio') }}">
+            <form method="GET" action="{{ url_for('dealer.pedidos_relatorio') }}">
                 <div class="row g-3">
                     <div class="col-md-3">
                         <label for="data_inicio" class="form-label">Data Início</label>
@@ -36,7 +36,7 @@
                 <div class="row mt-3">
                     <div class="col-12">
                         <button type="submit" class="btn btn-info"><i class="bi bi-search"></i> Filtrar</button>
-                        <a href="{{ url_for('pedidos_relatorio') }}" class="btn btn-outline-secondary">Limpar Filtros</a>
+                        <a href="{{ url_for('dealer.pedidos_relatorio') }}" class="btn btn-outline-secondary">Limpar Filtros</a>
                     </div>
                 </div>
             </form>
@@ -67,7 +67,7 @@
                             {% for pedido in pedidos %}
                             <tr>
                                 <td>PC-{{ pedido.id }}</td>
-                                <td><a href="{{ url_for('cotacao_detalhe', cotacao_id=pedido.cotacao_id) }}">COT-{{ pedido.cotacao_id }}</a></td>
+                                <td><a href="{{ url_for('dealer.cotacao_detalhe', cotacao_id=pedido.cotacao_id) }}">COT-{{ pedido.cotacao_id }}</a></td>
                                 <td>{{ pedido.fornecedor_nome }}</td>
                                 <td>R$ {{ "%.2f"|format(pedido.valor_total|float) }}</td>
                                 <td>{{ pedido.data_aprovacao }}</td>
@@ -77,7 +77,7 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('pedido_detalhe', pedido_id=pedido.id) }}" class="btn btn-info btn-sm">
+                                    <a href="{{ url_for('dealer.pedido_detalhe', pedido_id=pedido.id) }}" class="btn btn-info btn-sm">
                                         <i class="bi bi-eye"></i> Detalhes
                                     </a>
                                 </td>

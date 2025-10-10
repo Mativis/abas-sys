@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <a href="{{ url_for('cotacoes_relatorio') }}" class="btn btn-outline-secondary btn-sm mb-3">
+    <a href="{{ url_for('dealer.cotacoes_relatorio') }}" class="btn btn-outline-secondary btn-sm mb-3">
         <i class="bi bi-arrow-left"></i> Voltar para o Relatório
     </a>
 
@@ -63,7 +63,7 @@
                             <td>{{ orcamento.faturamento or '-' }}</td>
                             <td class="text-center">
                                 {% if cotacao.status == 'Fechada' and g.user.role in ['Administrador', 'Gestor'] %}
-                                <form method="POST" action="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}" class="d-inline">
+                                <form method="POST" action="{{ url_for('dealer.cotacao_detalhe', cotacao_id=cotacao.id) }}" class="d-inline">
                                     <input type="hidden" name="action" value="aprovar_orcamento">
                                     <input type="hidden" name="orcamento_id" value="{{ orcamento.id }}">
                                     <button type="submit" class="btn btn-sm btn-success" title="Aprovar este orçamento" onclick="return confirm('Tem certeza que deseja aprovar este orçamento e gerar um Pedido de Compra?')">
@@ -93,7 +93,7 @@
                 <h5 class="modal-title">Adicionar Orçamento para Cotação #{{ cotacao.id }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('cotacao_detalhe', cotacao_id=cotacao.id) }}">
+            <form method="POST" action="{{ url_for('dealer.cotacao_detalhe', cotacao_id=cotacao.id) }}">
                 <input type="hidden" name="action" value="adicionar_orcamento">
                 <div class="modal-body">
                     <div class="mb-3">
