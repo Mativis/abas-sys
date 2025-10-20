@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imprimir: {{ page.title }}</title>
+    
+    <style>
+        body {
+            font-family: 'Times New Roman', serif; /* Fonte clássica para documentos */
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            color: #111;
+            font-size: 10pt; /* Tamanho padrão de fonte para impressão */
+        }
+        .print-container {
+            width: 100%;
+            max-width: 180mm; /* Simulação da largura do conteúdo de uma folha A4 */
+            margin: 0 auto;
+        }
+        
+        /* Cabeçalho do Documento */
+        .page-header {
+            border-bottom: 1px solid #aaa;
+            padding-bottom: 5px;
+            margin-bottom: 25px;
+            font-family: Arial, sans-serif;
+        }
+        .page-title {
+            font-size: 24pt; /* Título um pouco menor, mais elegante */
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #000;
+        }
+        .page-metadata {
+            font-size: 8pt;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Conteúdo */
+        .content-body {
+            line-height: 1.5;
+        }
+        .content-block {
+            margin-bottom: 0.8em; /* Espaçamento vertical padronizado */
+            font-size: 11pt;
+            word-wrap: break-word;
+        }
+        
+        /* Estilos de Blocos */
+        .content-block h1, .content-block h2, .content-block h3 {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            color: #333;
+            margin-top: 1.2em;
+            margin-bottom: 0.5em;
+        }
+        .content-block h1 { font-size: 16pt; }
+        .content-block h2 { font-size: 14pt; }
+        .content-block h3 { font-size: 12pt; }
+        
+        /* Checklist */
+        .checklist-item {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0.5em;
+            display: flex;
+            align-items: flex-start;
+            font-size: 11pt;
+        }
+        /* Torna o checkbox visível e padronizado */
+        .checklist-item::before {
+            content: "\2610"; /* White check box (Unicode) */
+            margin-right: 8px;
+            font-size: 14pt; /* Tamanho ligeiramente maior */
+            line-height: 1.2;
+        }
+        .checklist-item.done::before {
+            content: "\2611"; /* Black check box (Checked Unicode) */
+        }
+        .checklist-item.done {
+            color: #666;
+        }
+
+        /* Otimização para impressão (Media Print) */
+        @media print {
+            body {
+                font-size: 10pt;
+            }
+            .print-container {
+                margin: 0;
+                max-width: 100%;
+            }
+            @page {
+                margin: 18mm 15mm 18mm 15mm; 
+            }
+            /* Garante que o texto riscado apareça corretamente */
+            .checklist-item.done {
+                 text-decoration: line-through;
+            }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="print-container">
+        <header class="page-header">
+            <h1 class="page-title">{{ page.title }}</h1>
+            <div class="page-metadata">
+                <span>
+                    Documento: 
+                    {% if page.category == 'frota' %}
+                        PLANEJAMENTO DE FROTA
+                    {% else %}
+                        HISTÓRICO DE MANUTENÇÃO
+                    {% endif %}
+                </span>
+                <span>Data de Emissão: {{ datetime.now().strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+        </header>
+
+        <main class="content-body">
+            {% set content_lines = page.content.split('\n') %}
+            {% for line in content_lines %}
+                {% set trimmed_line = line.strip() %}
+                {% set line_content = trimmed_line | replace('- [x]', '') | replace('- [ ]', '') | trim %}
+
+                {% if trimmed_line.startswith('### ') %}
+                    <h3 class="content-block">{{ trimmed_line | replace('###', '') | trim }}</h3>
+                {% elif trimmed_line.startswith('## ') %}
+                    <h2 class="content-block">{{ trimmed_line | replace('##', '') | trim }}</h2>
+                {% elif trimmed_line.startswith('# ') %}
+                    <h1 class="content-block">{{ trimmed_line | replace('#', '') | trim }}</h1>
+                {% elif trimmed_line.startswith('- [x]') %}
+                    <div class="checklist-item done">{{ line_content }}</div>
+                {% elif trimmed_line.startswith('- [ ]') %}
+                    <div class="checklist-item">{{ line_content }}</div>
+                {% elif trimmed_line %}
+                    <p class="content-block">{{ trimmed_line }}</p>
+                {% else %}
+                    <div style="margin-bottom: 0.5em;"></div>
+                {% endif %}
+            {% endfor %}
+
+            {% if not page.content.strip() %}
+                <p style="color: #888; font-style: italic;">Nenhum conteúdo nesta página.</p>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

@@ -45,7 +45,14 @@ from database import (
     obter_checklist_por_id,
     atualizar_checklist,
     excluir_checklist,
-    obter_pedido_compra_por_id
+    obter_pedido_compra_por_id,
+    # NOVAS IMPORTAÇÕES NOTION-LIKE
+    create_notion_page,
+    get_notion_pages_by_category,
+    get_notion_page_by_id,
+    update_notion_page,
+    transfer_notion_page,
+    delete_notion_page
 )
 from utils import login_required, roles_required
 
@@ -321,6 +328,70 @@ def serve_upload(filename):
     UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
     return send_from_directory(UPLOAD_FOLDER, filename)
 
+# --- NOVAS Rotas Notion-Like (LISTAGEM) ---
+
+@frota_bp.route('/frota-notion', methods=['GET'])
+@login_required
+def frota_notion():
+    search_query = request.args.get('search', '')
+    pages = get_notion_pages_by_category('frota', search_query if search_query else None)
+    
+    # Ordem de exibição: Ativa -> Transferida
+    order_status = {'Ativa': 1, 'Transferida': 2, 'Manual': 3}
+    pages.sort(key=lambda x: order_status.get(x['status'], 99))
+    
+    return render_template('frota_notion.html', active_page='frota_notion', pages=pages, search_query=search_query)
+
+@frota_bp.route('/historico-notion', methods=['GET'])
+@login_required
+def historico_notion():
+    search_query = request.args.get('search', '')
+    pages = get_notion_pages_by_category('historico', search_query if search_query else None)
+    
+    # Ordem de exibição: mais recente primeiro
+    pages.sort(key=lambda x: x['data_registro'], reverse=True)
+    
+    return render_template('historico_notion.html', active_page='historico_notion', pages=pages, search_query=search_query)
+
+# --- Rota Notion-Like (DETALHE/EDIÇÃO) ---
+
+@frota_bp.route('/notion-page/<id>', methods=['GET'])
+@login_required
+def notion_page_detail(id):
+    # CORREÇÃO: Recebe como string e converte para int aqui
+    try:
+        page_id = int(id)
+    except ValueError:
+        flash('ID de página inválido.', 'danger')
+        return redirect(url_for('frota.index'))
+
+    page = get_notion_page_by_id(page_id)
+    if not page:
+        flash('Página não encontrada.', 'danger')
+        return redirect(url_for('frota.index'))
+    
+    # Define o contexto para saber qual menu destacar e quais botões mostrar
+    context = page['category']
+    active_page = 'frota_notion' if page['category'] == 'frota' else 'historico_notion'
+    
+    # Renderiza o template de detalhe genérico
+    return render_template('notion_page_detail.html', 
+                           page=page, 
+                           context=context,
+                           active_page=active_page)
+
+# --- NOVA Rota de IMPRESSÃO ---
+@frota_bp.route('/notion-page/<int:id>/print', methods=['GET'])
+@login_required
+def notion_page_print(id):
+    page = get_notion_page_by_id(id)
+    if not page:
+        flash('Página não encontrada.', 'danger')
+        return redirect(url_for('frota.index'))
+
+    # Renderiza o template de impressão e passa a classe datetime para acesso ao now()
+    return render_template('notion_page_print.html', page=page, datetime=datetime)
+
 
 # --- APIs Frota / Raiz ---
 
@@ -578,3 +649,71 @@ def api_obter_requisicao(id):
     if requisicao:
         return jsonify(dict(requisicao))
     return jsonify({'error': 'Requisição não encontrada'}), 404
+
+# --- NOVAS APIs Notion-Like ---
+
+@frota_bp.route('/api/notion/page', methods=['POST'])
+@login_required
+def api_create_page():
+    dados = request.get_json()
+    try:
+        # A categoria deve ser enviada pelo frontend ('frota' ou 'historico')
+        page_id = create_notion_page(
+            session['user_id'],
+            dados['category'],
+            dados['title'],
+            dados.get('content')
+        )
+        if page_id: return jsonify({'success': True, 'id': page_id})
+        return jsonify({'success': False, 'error': 'Erro ao criar página'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@frota_bp.route('/api/notion/page/<int:id>', methods=['PUT', 'DELETE'])
+@login_required
+def api_manage_page(id):
+    if request.method == 'PUT':
+        dados = request.get_json()
+        try:
+            # Garante que o status seja enviado ou define como 'Ativa' se a página for de frota
+            page = get_notion_page_by_id(id)
+            if not page:
+                return jsonify({'success': False, 'error': 'Página não encontrada'}), 404
+
+            # Mantém o status atual se não for explicitamente enviado no payload
+            status = dados.get('status') or page.get('status') 
+            
+            # Garante que 'Transferida' ou 'Manual' não sejam substituídos por 'Ativa'
+            if page.get('category') == 'historico' and status == 'Ativa':
+                 status = 'Manual'
+            
+            if update_notion_page(id, dados['title'], dados['content'], status):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Erro ao atualizar página'}), 400
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+    
+    elif request.method == 'DELETE':
+        try:
+            if delete_notion_page(id):
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Página não encontrada'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+
+@frota_bp.route('/api/notion/transfer/<int:id>', methods=['POST'])
+@login_required
+def api_transfer_page(id):
+    """API para enviar uma página da Frota para o Histórico de Manutenções."""
+    try:
+        page = get_notion_page_by_id(id)
+        if not page or page['category'] != 'frota':
+            return jsonify({'success': False, 'error': 'Página de frota não encontrada ou já transferida'}), 404
+
+        # Transfere a página para a categoria 'historico' e marca como 'Transferida'
+        if transfer_notion_page(id, 'historico', 'Transferida'):
+            return jsonify({'success': True, 'page_id': id})
+        
+        return jsonify({'success': False, 'error': 'Erro ao transferir a página'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

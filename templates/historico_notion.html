@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Histórico de Manutenções (Notion){% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-journal-check"></i> Histórico de Manutenções (Notion)</h1>
+    <div class="d-flex gap-2">
+        <form method="GET" action="{{ url_for('frota.historico_notion') }}" class="d-flex align-items-center">
+            <input type="text" name="search" class="form-control form-control-sm me-2" placeholder="Buscar título..." value="{{ search_query or '' }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Buscar"><i class="bi bi-search"></i></button>
+            {% if search_query %}
+            <a href="{{ url_for('frota.historico_notion') }}" class="btn btn-sm btn-outline-danger ms-1" title="Limpar Busca"><i class="bi bi-x-lg"></i></a>
+            {% endif %}
+        </form>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#novaPaginaModal">
+            <i class="bi bi-plus-circle"></i> Novo Registro Manual
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Título/Assunto</th>
+                        <th scope="col" class="text-center">Origem</th>
+                        <th scope="col" class="text-center">Data do Registro</th>
+                        <th scope="col" class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for page in pages %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('frota.notion_page_detail', id=page.id) }}" class="text-decoration-none fw-bold">
+                                {{ page.title }}
+                            </a>
+                        </td>
+                        <td class="text-center">
+                            {% if page.status == 'Transferida' %}
+                                <span class="badge text-bg-success">Transferido de Frota</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">Registro Manual</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ page.data_registro.split(' ')[0] }}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-danger" onclick="excluirPagina({{ page.id }})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            {% if search_query %}
+                                Nenhuma página encontrada para a busca: <strong>"{{ search_query }}"</strong>.
+                                <a href="{{ url_for('frota.historico_notion') }}" class="btn btn-sm btn-secondary mt-2"><i class="bi bi-arrow-left"></i> Limpar Filtro</a>
+                            {% else %}
+                                Nenhum histórico de manutenção encontrado.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="novaPaginaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Criar Novo Registro Manual de Histórico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNovaPagina">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Título/Assunto *</label>
+                        <input type="text" class="form-control" id="page-title" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarPagina('historico')">Criar e Abrir</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showAlert(message, type) {
+        alert(`${type.toUpperCase()}: ${message}`);
+    }
+
+    // A URL base corrigida para evitar o erro de conversão de int
+    const detailUrlBase = "{{ url_for('frota.notion_page_detail', id='PLACEHOLDER_ID') }}";
+
+    function salvarPagina(category) {
+        const title = document.getElementById('page-title').value;
+        
+        if (!title) {
+            showAlert('O título é obrigatório.', 'warning');
+            return;
+        }
+
+        fetch('/api/notion/page', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, content: '', category })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Registro criado com sucesso!', 'success');
+                // Usa a constante de URL e substitui o placeholder pelo ID retornado
+                window.location.href = detailUrlBase.replace('PLACEHOLDER_ID', data.id);
+            } else {
+                showAlert('Erro ao criar página: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+    
+    function excluirPagina(id) {
+        if (!confirm('Tem certeza que deseja excluir este registro de histórico?')) return;
+
+        fetch(`/api/notion/page/${id}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Registro excluído com sucesso!', 'success');
+                location.reload(); 
+            } else {
+                showAlert('Erro ao excluir: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+</script>
+{% endblock %}

@@ -1293,13 +1293,6 @@ def obter_todas_requisicoes():
     conn.close()
     return requisicoes
 
-def obter_requisicoes_pendentes():
-    """Busca apenas as requisições com status 'Pendente'."""
-    conn = get_db_connection()
-    requisicoes = conn.execute("SELECT * FROM requisicoes_abastecimento WHERE status = 'Pendente' ORDER BY id DESC").fetchall()
-    conn.close()
-    return requisicoes
-
 def obter_requisicao_por_id(id):
     """Busca uma requisição específica pelo ID, juntando o nome do solicitante."""
     conn = get_db_connection()
@@ -1343,4 +1336,87 @@ def excluir_requisicao(id):
     conn.commit()
     rows_deleted = conn.total_changes
     conn.close()
-    return rows_deleted > 0    
+    return rows_deleted > 0
+
+# --- NOVAS Funções de Manutenção Notion-Like ---
+
+def create_notion_page(user_id, category, title, content=None):
+    """Cria uma nova página/lista no sistema Notion-like."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        status = 'Manual' if category == 'historico' else 'Ativa'
+        cursor.execute(
+            "INSERT INTO notion_pages (user_id, category, title, content, status) VALUES (?, ?, ?, ?, ?)",
+            (user_id, category, title, content or '', status)
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def get_notion_pages_by_category(category, search_query=None):
+    """
+    Busca todas as páginas de uma determinada categoria.
+    Adiciona filtro opcional por título.
+    """
+    conn = get_db_connection()
+    query = "SELECT * FROM notion_pages WHERE category = ?"
+    params = [category]
+    
+    if search_query:
+        query += " AND title LIKE ?"
+        params.append(f'%{search_query}%')
+        
+    query += " ORDER BY data_registro DESC"
+    
+    df = pd.read_sql(query, conn, params=params)
+    conn.close()
+    return df.to_dict('records')
+
+def get_notion_page_by_id(page_id):
+    """Busca uma página específica pelo ID."""
+    conn = get_db_connection()
+    query = "SELECT * FROM notion_pages WHERE id = ?"
+    result = conn.execute(query, (page_id,)).fetchone()
+    conn.close()
+    return dict(result) if result else None
+
+def update_notion_page(page_id, title, content, status='Ativa'):
+    """Atualiza o título, conteúdo e status de uma página."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE notion_pages SET title = ?, content = ?, status = ? WHERE id = ?",
+            (title, content, status, page_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def transfer_notion_page(page_id, new_category, new_status='Transferida'):
+    """Transfere uma página da Frota para Histórico e muda seu status."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE notion_pages SET category = ?, status = ? WHERE id = ?",
+            (new_category, new_status, page_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def delete_notion_page(page_id):
+    """Exclui uma página."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM notion_pages WHERE id = ?", (page_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()

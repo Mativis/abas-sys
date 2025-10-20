@@ -153,6 +153,8 @@
                 </a>
                 <div class="collapse submenu" id="frotaSubmenu">
                     <ul class="nav flex-column">
+                        <li><a class="nav-link {% if active_page == 'frota_notion' %}active{% endif %}" href="{{ url_for('frota.frota_notion') }}"><i class="bi bi-card-list"></i> Frota (Planejamento)</a></li>
+                        <li><a class="nav-link {% if active_page == 'historico_notion' %}active{% endif %}" href="{{ url_for('frota.historico_notion') }}"><i class="bi bi-journal-check"></i> Histórico de Manutenções</a></li>
                         <li><a class="nav-link {% if active_page == 'requisicoes' %}active{% endif %}" href="{{ url_for('frota.requisicoes') }}">Requisições</a></li>
                         <li><a class="nav-link {% if active_page == 'relatorios' %}active{% endif %}" href="{{ url_for('frota.relatorios') }}">Abastecimentos</a></li>
                         <li><a class="nav-link {% if active_page == 'manutencoes' %}active{% endif %}" href="{{ url_for('frota.manutencoes') }}">Manutenções</a></li>

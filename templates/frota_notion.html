@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Frota - Planejamento (Notion){% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-card-list"></i> Frota - Planejamento (Notion)</h1>
+    <div class="d-flex gap-2">
+        <form method="GET" action="{{ url_for('frota.frota_notion') }}" class="d-flex align-items-center">
+            <input type="text" name="search" class="form-control form-control-sm me-2" placeholder="Buscar título..." value="{{ search_query or '' }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Buscar"><i class="bi bi-search"></i></button>
+            {% if search_query %}
+            <a href="{{ url_for('frota.frota_notion') }}" class="btn btn-sm btn-outline-danger ms-1" title="Limpar Busca"><i class="bi bi-x-lg"></i></a>
+            {% endif %}
+        </form>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#novaPaginaModal">
+            <i class="bi bi-plus-circle"></i> Criar Nova Página
+        </button>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="page-list-container">
+    {% for page in pages %}
+    <div class="col">
+        <div class="card h-100 notion-page-card shadow-sm border-0 border-start border-4
+                    {% if page.status == 'Ativa' %}border-info{% elif page.status == 'Transferida' %}border-success{% else %}border-secondary{% endif %}"
+             style="transition: transform 0.2s ease;">
+            
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="card-title text-truncate mb-1">
+                        <a href="{{ url_for('frota.notion_page_detail', id=page.id) }}" class="text-decoration-none text-body fw-bold">
+                            {{ page.title }}
+                        </a>
+                    </h5>
+                    <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="excluirPagina({{ page.id }})" title="Excluir Permanentemente">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                
+                <p class="card-text text-muted small mt-1">
+                    <i class="bi bi-clock"></i> Atualizado em: {{ page.data_registro.split(' ')[0] }}
+                </p>
+
+                <div class="mt-auto pt-2">
+                    {% if page.status == 'Ativa' %}
+                        <span class="badge text-bg-info"><i class="bi bi-lightbulb"></i> Planejamento Ativo</span>
+                    {% elif page.status == 'Transferida' %}
+                        <span class="badge text-bg-success"><i class="bi bi-check2-circle"></i> Enviado para Histórico</span>
+                    {% else %}
+                        <span class="badge text-bg-secondary">{{ page.status }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card-footer bg-transparent border-0 d-flex justify-content-end pb-3 pt-0">
+                 <a href="{{ url_for('frota.notion_page_detail', id=page.id) }}" class="btn btn-sm btn-outline-primary">
+                    Abrir Página <i class="bi bi-arrow-right"></i>
+                 </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        {% if search_query %}
+            <i class="bi bi-search display-1 text-muted"></i>
+            <p class="mt-3 text-muted">Nenhuma página encontrada para a busca: <strong>"{{ search_query }}"</strong>.</p>
+            <a href="{{ url_for('frota.frota_notion') }}" class="btn btn-sm btn-secondary mt-2"><i class="bi bi-arrow-left"></i> Limpar Filtro</a>
+        {% else %}
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="mt-3 text-muted">Nenhuma página de planejamento criada ainda.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="novaPaginaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Criar Nova Página (Frota)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNovaPagina">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Título da Página *</label>
+                        <input type="text" class="form-control" id="page-title" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarPagina('frota')">Criar e Abrir</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showAlert(message, type) {
+        alert(`${type.toUpperCase()}: ${message}`);
+    }
+
+    const detailUrlBase = "{{ url_for('frota.notion_page_detail', id='PLACEHOLDER_ID') }}";
+
+    function salvarPagina(category) {
+        const title = document.getElementById('page-title').value;
+        
+        if (!title) {
+            showAlert('O título é obrigatório.', 'warning');
+            return;
+        }
+
+        fetch('/api/notion/page', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, content: '', category })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Página criada com sucesso!', 'success');
+                // Redireciona para a nova página de detalhe
+                window.location.href = detailUrlBase.replace('PLACEHOLDER_ID', data.id);
+            } else {
+                showAlert('Erro ao criar página: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+
+    function excluirPagina(id) {
+        if (!confirm('Tem certeza que deseja excluir permanentemente esta página?')) return;
+
+        fetch(`/api/notion/page/${id}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Página excluída com sucesso!', 'success');
+                location.reload(); 
+            } else {
+                showAlert('Erro ao excluir: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+</script>
+
+<style>
+    .notion-page-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+        cursor: pointer;
+    }
+    .notion-page-card a {
+        color: inherit !important;
+    }
+    .notion-page-card .card-body {
+        padding-bottom: 0.5rem; /* Ajusta padding para o footer */
+    }
+</style>
+{% endblock %}

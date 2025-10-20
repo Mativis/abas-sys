@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} | Notion{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="row">
+        <div class="col-lg-10 offset-lg-1 col-xl-8 offset-xl-2">
+
+            <div class="sticky-top bg-white pt-2 pb-2 notion-actions-bar">
+                <div class="d-flex justify-content-between align-items-center mb-3 pt-2 border-bottom">
+                    <div>
+                        {% if page.status == 'Transferida' %}
+                            <span class="badge text-bg-success"><i class="bi bi-check2-circle"></i> Transferida</span>
+                            <span class="text-muted small ms-3">Origem: Frota</span>
+                        {% elif page.status == 'Manual' %}
+                            <span class="badge text-bg-secondary"><i class="bi bi-file-earmark"></i> Manual</span>
+                        {% else %}
+                             <span class="badge text-bg-info"><i class="bi bi-lightbulb"></i> Planejamento Ativo</span>
+                        {% endif %}
+                        <span class="text-muted small ms-3 d-none d-md-inline">Última atualização: {{ page.data_registro.split(' ')[0] }}</span>
+                        <span id="saveStatus" class="ms-3 small text-success opacity-0">Salvo!</span>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {% if context == 'frota' and page.status != 'Transferida' %}
+                            <button class="btn btn-sm btn-warning" onclick="confirmarTransferencia({{ page.id }}, '{{ page.title }}')" title="Enviar para Histórico de Manutenção">
+                                <i class="bi bi-archive"></i> <span class="d-none d-lg-inline">Transferir</span>
+                            </button>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('frota.notion_page_print', id=page.id) }}" target="_blank" class="btn btn-sm btn-outline-info" title="Imprimir Página (Layout Padronizado)">
+                            <i class="bi bi-printer"></i>
+                        </a>
+                        
+                        <button class="btn btn-sm btn-outline-danger" onclick="excluirPagina({{ page.id }}, '{{ context }}')" title="Excluir Permanentemente">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <input type="text" id="pageTitle" class="form-control notion-title-input" value="{{ page.title }}" onblur="salvarAutomatico({{ page.id }})" oninput="updatePageTitlePreview(this.value)" placeholder="Título da Página">
+
+            <div id="pageContentWrapper" class="notion-view mt-4" style="min-height: 50vh;">
+                <div id="pageContent" 
+                     contenteditable="true" 
+                     class="content-editor"
+                     oninput="updateBlocks()"
+                     onblur="salvarAutomatico({{ page.id }})"
+                     onclick="handleCheckboxClick(event)">
+                    </div>
+            </div>
+            
+            <small class="form-text text-muted d-block mt-3 text-center">
+                Dicas: Use **# Espaço** para H1, **## Espaço** para H2, **### Espaço** para H3. Use **- [ ] Espaço** para Checklist.
+            </small>
+            
+        </div>
+    </div>
+</div>
+
+<script>
+    const pageId = {{ page.id }};
+    const pageCategory = '{{ context }}';
+    const contentDiv = document.getElementById('pageContent');
+    const saveStatusElement = document.getElementById('saveStatus');
+    // Conteúdo bruto é carregado aqui. O uso de `| tojson` ajuda a escapar strings para JS.
+    // Usamos | replace para garantir que quebras de linha sejam interpretadas corretamente no JS.
+    const rawContent = `{{ page.content | replace('\n', '\\n') | replace('\r', '') }}`; 
+
+    function showAlert(message, type) {
+        console.log(`${type.toUpperCase()}: ${message}`);
+    }
+
+    // --- UTILS DE CURSOR ---
+
+    function getCursorBlock() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return null;
+        let node = selection.getRangeAt(0).startContainer;
+        
+        if (node.nodeType === 3) { 
+            node = node.parentNode;
+        }
+
+        while (node && node.id !== 'pageContent') {
+            if (node.parentNode === contentDiv) {
+                return node;
+            }
+            node = node.parentNode;
+        }
+        return null;
+    }
+
+    function setCursorEnd(element) {
+        const range = document.createRange();
+        const selection = window.getSelection();
+        if (element.childNodes.length > 0 && element.lastChild.nodeType === 3) {
+            range.setStart(element.lastChild, element.lastChild.length);
+        } else {
+             range.selectNodeContents(element);
+        }
+        range.collapse(false); 
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    
+    // --- CONVERSÃO DE CONTEÚDO ---
+
+    function markdownToHtml(markdownText) {
+        const lines = markdownText.split('\\n');
+        let html = '';
+
+        lines.forEach(line => {
+            line = line.trim();
+            html += `<div>${line || '<br>'}</div>`;
+        });
+
+        if (html.length < 5) {
+             html = '<div><br></div>';
+        }
+        return html;
+    }
+
+    function htmlToMarkdown(element) {
+        const blocks = Array.from(element.children).map(node => node.textContent || node.innerText || '').filter(text => text.trim() !== '');
+        return blocks.join('\n');
+    }
+
+    // --- FUNÇÕES DE EDIÇÃO EM TEMPO REAL ---
+
+    function changeBlockTag(oldBlock, newTag, newText) {
+        const newBlock = document.createElement(newTag);
+        newBlock.innerHTML = newText;
+        // Copia classes de checklist, se houver
+        if (oldBlock.classList.contains('notion-checklist-item-done')) {
+             newBlock.classList.add('notion-checklist-item-done');
+        } else if (oldBlock.classList.contains('notion-checklist-item')) {
+             newBlock.classList.add('notion-checklist-item');
+        }
+        
+        oldBlock.parentNode.replaceChild(newBlock, oldBlock);
+        
+        // Reposiciona o cursor
+        setCursorEnd(newBlock);
+        return newBlock;
+    }
+
+    function insertCheckbox(block, isChecked) {
+        // Remove checkbox existente para evitar duplicatas
+        block.querySelectorAll('.notion-checkbox').forEach(el => el.remove());
+
+        const iconClass = isChecked ? 'bi-check-square-fill text-primary' : 'bi-square text-muted';
+        const checkboxHtml = `<span class="notion-checkbox d-inline-block me-2" contenteditable="false"><i class="bi ${iconClass}"></i></span>`;
+        
+        // Insere o elemento no início do bloco
+        block.insertAdjacentHTML('afterbegin', checkboxHtml);
+    }
+
+    function updateBlocks() {
+        let currentBlock = getCursorBlock();
+        if (!currentBlock) return;
+
+        const text = currentBlock.textContent.trimStart();
+        const currentTag = currentBlock.tagName;
+
+        // Limpa o estado visual do checkbox
+        currentBlock.classList.remove('notion-checklist-item', 'notion-checklist-item-done');
+        currentBlock.querySelectorAll('.notion-checkbox').forEach(el => el.remove());
+
+
+        // 1. Headers
+        if (text.startsWith('### ')) {
+            if (currentTag !== 'H3') {
+                currentBlock = changeBlockTag(currentBlock, 'H3', text.substring(4));
+            }
+        } else if (text.startsWith('## ')) {
+            if (currentTag !== 'H2') {
+                currentBlock = changeBlockTag(currentBlock, 'H2', text.substring(3));
+            }
+        } else if (text.startsWith('# ')) {
+            if (currentTag !== 'H1') {
+                currentBlock = changeBlockTag(currentBlock, 'H1', text.substring(2));
+            }
+        } 
+        // 2. To-Do List (Adiciona checkbox visual e classes)
+        else if (text.startsWith('- [x] ') || text.startsWith('- [ ] ')) {
+            if (currentTag !== 'DIV') {
+                 currentBlock = changeBlockTag(currentBlock, 'DIV', currentBlock.textContent);
+             }
+            
+            const isChecked = text.startsWith('- [x]');
+            
+            insertCheckbox(currentBlock, isChecked);
+            currentBlock.classList.add(isChecked ? 'notion-checklist-item-done' : 'notion-checklist-item');
+
+        }
+        // 3. Reverter para DIV se o prefixo for removido
+        else {
+            if (currentTag !== 'DIV' && !text.match(/^[#\-]/)) {
+                currentBlock = changeBlockTag(currentBlock, 'DIV', currentBlock.textContent);
+            }
+            currentBlock.classList.remove('notion-checklist-item', 'notion-checklist-item-done');
+        }
+    }
+    
+    // --- FUNÇÃO DE INTERAÇÃO DO CHECKBOX (Ao Clicar) ---
+
+    function handleCheckboxClick(event) {
+        if (event.target.closest('.notion-checkbox')) {
+            const block = event.target.closest('div, h1, h2, h3');
+            if (!block) return;
+            
+            const textContent = block.textContent;
+            
+            // Verifica se o texto começa com a sintaxe de checklist
+            if (textContent.startsWith('- [x]')) {
+                // Se estiver marcada, desmarca: - [x] -> - [ ]
+                block.textContent = textContent.replace('- [x]', '- [ ]');
+            } else if (textContent.startsWith('- [ ]')) {
+                // Se estiver desmarcada, marca: - [ ] -> - [x]
+                block.textContent = textContent.replace('- [ ]', '- [x]');
+            }
+            
+            // Garante a transformação visual imediata e salva
+            updateBlocks();
+            salvarAutomatico(pageId); 
+            event.preventDefault(); 
+            event.stopPropagation();
+        }
+    }
+
+
+    // --- FUNÇÕES DE SALVAMENTO E NAVEGAÇÃO ---
+
+    function showSaveStatus(isSaving) {
+        if (isSaving) {
+            saveStatusElement.textContent = 'Salvando...';
+            saveStatusElement.classList.remove('text-success', 'text-danger', 'opacity-0');
+            saveStatusElement.classList.add('text-warning', 'opacity-100');
+        } else {
+            saveStatusElement.textContent = 'Salvo!';
+            saveStatusElement.classList.remove('text-warning', 'text-danger');
+            saveStatusElement.classList.add('text-success', 'opacity-100');
+            setTimeout(() => {
+                saveStatusElement.classList.remove('opacity-100');
+                saveStatusElement.classList.add('opacity-0');
+            }, 2000); 
+        }
+    }
+
+    function salvarAutomatico(id) {
+        updateBlocks(); 
+        efetuarSalvamento(id);
+    }
+
+    function efetuarSalvamento(id) {
+        const title = document.getElementById('pageTitle').value;
+        const content = htmlToMarkdown(contentDiv);
+        const currentStatus = '{{ page.status }}';
+
+        if (!title) {
+            showAlert('O título não pode estar vazio!', 'danger');
+            return;
+        }
+
+        showSaveStatus(true); // Exibe "Salvando..."
+
+        fetch(`/api/notion/page/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, content, status: currentStatus })
+        })
+        .then(response => {
+            if (response.ok) {
+                showSaveStatus(false); // Exibe "Salvo!"
+            } else {
+                 saveStatusElement.textContent = 'Erro ao salvar!';
+                 saveStatusElement.classList.remove('text-success', 'text-warning');
+                 saveStatusElement.classList.add('text-danger', 'opacity-100');
+                 response.json().then(data => {
+                    showAlert('Erro ao salvar: ' + (data.error || 'Desconhecido'), 'danger');
+                });
+            }
+        })
+        .catch(error => {
+            saveStatusElement.textContent = 'Erro de rede!';
+            saveStatusElement.classList.remove('text-success', 'text-warning');
+            saveStatusElement.classList.add('text-danger', 'opacity-100');
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+
+    function updatePageTitlePreview(title) {
+         document.title = title + ' | Notion';
+    }
+    
+    function confirmarTransferencia(id, title) {
+        if (!confirm(`Tem certeza que deseja ENVIAR a página "${title}" para o Histórico de Manutenções? Ela não será mais editável na Frota.`)) return;
+
+        fetch(`/api/notion/transfer/${id}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(`Página "${title}" enviada com sucesso para o Histórico de Manutenções!`, 'success');
+                window.location.href = "{{ url_for('frota.historico_notion') }}";
+            } else {
+                showAlert('Erro ao enviar: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+
+    function excluirPagina(id, context) {
+        if (!confirm('Tem certeza que deseja excluir permanentemente esta página?')) return;
+
+        fetch(`/api/notion/page/${id}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Página excluída com sucesso!', 'success');
+                if (context === 'frota') {
+                    window.location.href = "{{ url_for('frota.frota_notion') }}";
+                } else {
+                    window.location.href = "{{ url_for('frota.frota_notion') }}"; 
+                }
+            } else {
+                showAlert('Erro ao excluir: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Erro de comunicação com a API.', 'danger');
+        });
+    }
+
+    // Inicializa a visualização ao carregar a página
+    window.onload = function() {
+        // Carrega o HTML do Markdown
+        contentDiv.innerHTML = markdownToHtml(rawContent);
+        
+        // Aplica a formatação em todos os blocos ao carregar
+        Array.from(contentDiv.children).forEach(block => {
+            // Chamamos o updateBlocks para que ele insira o checkbox visualmente
+            const text = block.textContent.trimStart();
+            if (text.startsWith('- [x]') || text.startsWith('- [ ]')) {
+                 const isChecked = text.startsWith('- [x]');
+                 insertCheckbox(block, isChecked);
+                 block.classList.add(isChecked ? 'notion-checklist-item-done' : 'notion-checklist-item');
+            }
+        });
+        
+        // Define o foco inicial
+        if (document.getElementById('pageTitle').value.trim()) {
+            contentDiv.focus(); 
+        } else {
+            document.getElementById('pageTitle').focus();
+        }
+    };
+</script>
+
+<style>
+    /* Sticky bar com z-index alto para garantir que cubra o conteúdo ao rolar */
+    .notion-actions-bar {
+        z-index: 1020; 
+        background-color: var(--bs-body-bg) !important;
+    }
+    
+    /* Input do Título (Maior e sem bordas) */
+    .notion-title-input {
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        line-height: 1.2;
+        padding: 0;
+        margin-bottom: 1.5rem !important;
+        background: transparent !important;
+        border: none !important;
+    }
+    .notion-title-input:focus {
+        box-shadow: none !important;
+        border-color: transparent !important;
+    }
+
+    /* Área de Conteúdo ContentEditable (Layout Minimalista) */
+    .notion-view {
+        background-color: transparent !important; 
+        box-shadow: none !important; 
+        border: none !important; 
+        padding: 0 !important; 
+        outline: none; 
+        cursor: text;
+    }
+
+    /* Estilos para tags internas (Blocos) */
+    .notion-view h1, .notion-view h2, .notion-view h3 {
+        margin-top: 1.5em; 
+        margin-bottom: 0.8em;
+        font-family: inherit;
+        font-weight: 600;
+        cursor: text;
+        transition: opacity 0.1s ease;
+    }
+    .notion-view div {
+        margin-bottom: 0.1em; 
+        min-height: 1.6em;
+        outline: none; 
+        transition: opacity 0.1s ease;
+        padding: 0.1em 0;
+        position: relative;
+    }
+    
+    /* Estilo para o ícone de checkbox (o elemento que o JS injeta) */
+    .notion-checkbox {
+        font-size: 1.2em; /* Ícone maior */
+        width: 1.2em;
+        height: 1.2em;
+        line-height: 1;
+        cursor: pointer;
+        /* Posiciona o ícone sobre a sintaxe do texto */
+        position: absolute;
+        left: -1.8em; 
+        top: 0.2em;
+    }
+
+    /* Efeito de hover suave nos blocos */
+    .notion-view div:hover, .notion-view h1:hover, .notion-view h2:hover, .notion-view h3:hover {
+        opacity: 0.95; 
+    }
+    
+    /* Estilos para Checklist */
+    .notion-checklist-item-done {
+        opacity: 0.6;
+        text-decoration: line-through;
+    }
+
+    /* Estilo para a mensagem de status de salvamento */
+    #saveStatus {
+        transition: opacity 0.3s ease-in-out;
+    }
+
+</style>
+{% endblock %}
