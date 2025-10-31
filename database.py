@@ -333,6 +333,8 @@ def finalizar_pedido_compra(pedido_id, dados):
 # --- (O resto das funções permanecem as mesmas) ---
 def obter_dealer_intelligence(data_inicio, data_fim):
     conn = get_db_connection()
+    
+    # Query para obter todos os orçamentos das cotações no período
     query_orcamentos = '''
         SELECT c.id as cotacao_id, o.valor
         FROM orcamentos o
@@ -340,6 +342,8 @@ def obter_dealer_intelligence(data_inicio, data_fim):
         WHERE c.data_registro BETWEEN ? AND ?
     '''
     df_orcamentos = pd.read_sql(query_orcamentos, conn, params=(data_inicio, data_fim))
+    
+    # Query para obter pedidos finalizados no período
     query_pedidos = '''
         SELECT p.valor_total, p.data_abertura, p.data_finalizacao, o.cotacao_id
         FROM pedidos_compra p
@@ -348,31 +352,50 @@ def obter_dealer_intelligence(data_inicio, data_fim):
     '''
     df_pedidos = pd.read_sql(query_pedidos, conn, params=(data_inicio, data_fim))
     conn.close()
+    
+    # Inicializar variáveis
     total_fechado = df_pedidos['valor_total'].sum() if not df_pedidos.empty else 0
     total_orcado = 0
     valor_poupado = 0
     descontos_perdidos = 0
+    
+    # Processar cada cotação que tem orçamentos
     if not df_orcamentos.empty:
-        total_orcado = df_orcamentos.groupby('cotacao_id')['valor'].min().sum()
+        # Para cada cotação, calcular o valor mínimo e máximo dos orçamentos
         for cotacao_id, group in df_orcamentos.groupby('cotacao_id'):
+            valor_minimo = group['valor'].min()
+            valor_maximo = group['valor'].max()
+            total_orcado += valor_minimo  # Mantém a lógica atual para referência
+            
+            # Verificar se esta cotação tem um pedido finalizado
             if cotacao_id in df_pedidos['cotacao_id'].values:
-                menor_valor = group['valor'].min()
-                valor_aprovado = df_pedidos[df_pedidos['cotacao_id'] == cotacao_id]['valor_total'].iloc[0]
-                if valor_aprovado < menor_valor:
-                     valor_poupado += menor_valor - valor_aprovado
-                elif valor_aprovado > menor_valor:
-                    descontos_perdidos += valor_aprovado - menor_valor
+                valor_selecionado = df_pedidos[df_pedidos['cotacao_id'] == cotacao_id]['valor_total'].iloc[0]
+                
+                # CORREÇÃO: Aplicar a lógica correta
+                # Valor Poupado = Valor máximo - Valor selecionado
+                valor_poupado += max(0, valor_maximo - valor_selecionado)
+                
+                # Descontos Perdidos = Valor selecionado - Valor mínimo
+                descontos_perdidos += max(0, valor_selecionado - valor_minimo)
+    
+    # NOVA LÓGICA: Saldo = Valor Poupado - Descontos Perdidos
+    saldo = valor_poupado - descontos_perdidos
+    
+    # Cálculo do tempo de processamento (mantido igual)
     media_dias_processamento = 0
     relatorio_processamento = []
+    
     if not df_pedidos.empty and 'data_finalizacao' in df_pedidos.columns and pd.notna(df_pedidos['data_finalizacao']).all():
         df_pedidos['data_abertura'] = pd.to_datetime(df_pedidos['data_abertura'])
         df_pedidos['data_finalizacao'] = pd.to_datetime(df_pedidos['data_finalizacao'])
         df_pedidos['dias_processamento'] = (df_pedidos['data_finalizacao'] - df_pedidos['data_abertura']).dt.days
         media_dias_processamento = df_pedidos['dias_processamento'].mean()
         relatorio_processamento = df_pedidos[['data_abertura', 'data_finalizacao', 'dias_processamento']].to_dict('records')
+    
     return {
         'total_fechado': total_fechado,
-        'total_orcado': total_orcado,
+        'total_orcado': total_orcado,  # Mantido para referência, mas não será exibido
+        'saldo': saldo,  # NOVO: Saldo calculado
         'valor_poupado': valor_poupado,
         'descontos_perdidos': descontos_perdidos,
         'media_dias_processamento': media_dias_processamento if pd.notna(media_dias_processamento) else 0,

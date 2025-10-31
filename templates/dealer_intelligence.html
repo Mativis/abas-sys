@@ -28,9 +28,11 @@
             <div class="col-md-3">
                 <div class="card text-center bg-light h-100">
                     <div class="card-body">
-                        <h5><i class="bi bi-file-earmark-text text-primary"></i> Valor Orçado</h5>
-                        <h3>R$ {{ "%.2f"|format(data.total_orcado) }}</h3>
-                        <small>Soma dos menores orçamentos</small>
+                        <h5><i class="bi bi-calculator text-primary"></i> Saldo</h5>
+                        <h3 class="{% if data.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ "%.2f"|format(data.saldo) }}
+                        </h3>
+                        <small>Valor Poupado - Descontos Perdidos</small>
                     </div>
                 </div>
             </div>
@@ -48,7 +50,7 @@
                     <div class="card-body">
                         <h5><i class="bi bi-graph-up text-success"></i> Valor Poupado</h5>
                         <h3 class="text-success">R$ {{ "%.2f"|format(data.valor_poupado) }}</h3>
-                        <small>Economia em negociações</small>
+                        <small>Diferença do valor máximo</small>
                     </div>
                 </div>
             </div>
@@ -57,7 +59,7 @@
                     <div class="card-body">
                         <h5><i class="bi bi-graph-down text-danger"></i> Descontos Perdidos</h5>
                         <h3 class="text-danger">R$ {{ "%.2f"|format(data.descontos_perdidos) }}</h3>
-                        <small>Diferença do menor orçamento</small>
+                        <small>Diferença do valor mínimo</small>
                     </div>
                 </div>
             </div>
@@ -92,6 +94,32 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-1"></i> Como Interpretar os Indicadores
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-calculator text-primary me-1"></i>Saldo</h6>
+                        <p class="small">Representa o resultado líquido das negociações:</p>
+                        <ul class="small">
+                            <li><strong class="text-success">Saldo Positivo</strong>: Boa performance - economizou mais do que perdeu em descontos</li>
+                            <li><strong class="text-danger">Saldo Negativo</strong>: Oportunidade de melhoria - perdeu mais em descontos do que economizou</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-graph-up text-success me-1"></i>Valor Poupado vs <i class="bi bi-graph-down text-danger me-1"></i>Descontos Perdidos</h6>
+                        <p class="small">Mostra a eficiência na escolha de fornecedores:</p>
+                        <ul class="small">
+                            <li><strong>Valor Poupado</strong>: Economia por não escolher o orçamento mais caro</li>
+                            <li><strong>Descontos Perdidos</strong>: Oportunidade perdida por não escolher o orçamento mais barato</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
