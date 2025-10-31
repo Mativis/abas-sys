@@ -180,22 +180,39 @@ def metricas_uso():
             if request.form.get('identificacao_original'):
                 identificacao_original = request.form['identificacao_original']
                 tipo_original = request.form['tipo_original']
+                
+                # Obter e converter os valores
+                km_troca = request.form.get('km_troca')
+                horimetro_troca = request.form.get('horimetro_troca')
+                
+                # Converter para float se existirem, caso contrário manter como None
+                km_troca = float(km_troca) if km_troca else None
+                horimetro_troca = float(horimetro_troca) if horimetro_troca else None
+                
                 if atualizar_troca_oleo(
                     identificacao_original, 
                     tipo_original, 
                     request.form['data_troca'], 
-                    km_troca=request.form.get('km_troca'), 
-                    horimetro_troca=request.form.get('horimetro_troca')):
+                    km_troca=km_troca, 
+                    horimetro_troca=horimetro_troca):
                     flash('Registro de troca de óleo atualizado com sucesso!', 'success')
                 else:
                     flash('Erro ao atualizar registro de troca de óleo.', 'danger')
             else:
+                # Obter e converter os valores para novo registro
+                km_troca = request.form.get('km_troca')
+                horimetro_troca = request.form.get('horimetro_troca')
+                
+                # Converter para float se existirem, caso contrário manter como None
+                km_troca = float(km_troca) if km_troca else None
+                horimetro_troca = float(horimetro_troca) if horimetro_troca else None
+                
                 if salvar_troca_oleo(
                     request.form['identificacao'], 
                     request.form['tipo'], 
                     request.form['data_troca'], 
-                    km_troca=request.form.get('km_troca'), 
-                    horimetro_troca=request.form.get('horimetro_troca')):
+                    km_troca=km_troca, 
+                    horimetro_troca=horimetro_troca):
                     flash('Registro de troca de óleo salvo com sucesso!', 'success')
                 else:
                     flash('Erro ao salvar novo registro de troca de óleo.', 'danger')
@@ -649,6 +666,104 @@ def api_obter_requisicao(id):
     if requisicao:
         return jsonify(dict(requisicao))
     return jsonify({'error': 'Requisição não encontrada'}), 404
+
+# --- NOVA API para Relatório de Manutenções ---
+@frota_bp.route('/api/manutencoes/relatorio', methods=['GET'])
+@login_required
+def api_relatorio_manutencoes():
+    """API para gerar relatório completo de manutenções para impressão"""
+    try:
+        # Obter parâmetros de filtro da query string
+        filtro_identificacao = request.args.get('identificacao', '')
+        filtro_status = request.args.get('status', 'todos')
+        filtro_tipo = request.args.get('tipo', 'todos')
+        filtro_frota = request.args.get('frota', 'todos')
+        filtro_pagamento = request.args.get('pagamento', 'todos')
+        data_inicio = request.args.get('data_inicio', '')
+        data_fim = request.args.get('data_fim', '')
+        ordenar_por = request.args.get('ordenar_por', 'data_abertura')
+        ordenar_direcao = request.args.get('ordenar_direcao', 'desc')
+        
+        # Obter todas as manutenções
+        manutencoes_list = obter_manutencoes()
+        
+        # Aplicar filtros
+        manutencoes_filtradas = []
+        for manutencao in manutencoes_list:
+            # Filtro por identificação
+            if filtro_identificacao and filtro_identificacao.lower() not in manutencao['identificacao'].lower():
+                continue
+            
+            # Filtro por status
+            if filtro_status != 'todos':
+                if filtro_status == 'aberto' and manutencao['finalizada']:
+                    continue
+                if filtro_status == 'finalizado' and not manutencao['finalizada']:
+                    continue
+            
+            # Filtro por tipo
+            if filtro_tipo != 'todos' and manutencao['tipo'] != filtro_tipo:
+                continue
+            
+            # Filtro por frota
+            if filtro_frota != 'todos' and manutencao['frota'] != filtro_frota:
+                continue
+            
+            # Filtro por forma de pagamento
+            if filtro_pagamento != 'todos' and manutencao.get('forma_pagamento') != filtro_pagamento:
+                continue
+            
+            # Filtro por data
+            if data_inicio:
+                data_abertura = datetime.strptime(manutencao['data_abertura'], '%Y-%m-%d')
+                data_inicio_filtro = datetime.strptime(data_inicio, '%Y-%m-%d')
+                if data_abertura < data_inicio_filtro:
+                    continue
+            
+            if data_fim:
+                data_abertura = datetime.strptime(manutencao['data_abertura'], '%Y-%m-%d')
+                data_fim_filtro = datetime.strptime(data_fim, '%Y-%m-%d')
+                if data_abertura > data_fim_filtro:
+                    continue
+            
+            manutencoes_filtradas.append(manutencao)
+        
+        # Ordenar resultados
+        if ordenar_por == 'valor':
+            manutencoes_filtradas.sort(key=lambda x: x.get('valor', 0), reverse=(ordenar_direcao == 'desc'))
+        elif ordenar_por == 'identificacao':
+            manutencoes_filtradas.sort(key=lambda x: x.get('identificacao', '').lower(), reverse=(ordenar_direcao == 'desc'))
+        else:  # data_abertura (padrão)
+            manutencoes_filtradas.sort(key=lambda x: x.get('data_abertura', ''), reverse=(ordenar_direcao == 'desc'))
+        
+        # Calcular estatísticas do relatório filtrado
+        total_valor = sum(m['valor'] for m in manutencoes_filtradas)
+        total_abertas = sum(1 for m in manutencoes_filtradas if not m['finalizada'])
+        total_finalizadas = sum(1 for m in manutencoes_filtradas if m['finalizada'])
+        
+        return jsonify({
+            'success': True,
+            'manutencoes': manutencoes_filtradas,
+            'estatisticas': {
+                'total': len(manutencoes_filtradas),
+                'abertas': total_abertas,
+                'finalizadas': total_finalizadas,
+                'valor_total': total_valor
+            },
+            'filtros_aplicados': {
+                'identificacao': filtro_identificacao,
+                'status': filtro_status,
+                'tipo': filtro_tipo,
+                'frota': filtro_frota,
+                'pagamento': filtro_pagamento,
+                'data_inicio': data_inicio,
+                'data_fim': data_fim,
+                'ordenar_por': ordenar_por,
+                'ordenar_direcao': ordenar_direcao
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # --- NOVAS APIs Notion-Like ---
 

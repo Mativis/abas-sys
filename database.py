@@ -1093,28 +1093,34 @@ def atualizar_troca_oleo(identificacao, tipo, data_troca, km_troca=None, horimet
             if km_troca is None:
                 raise ValueError("KM da troca é obrigatório para veículos")
             
+            # Converter para float para garantir o tipo numérico
+            km_troca = float(km_troca) if km_troca is not None else None
+            
             # Se já existe registro, calcular a próxima troca baseada no NOVO km_troca
             if existing_data:
                 # Usar o NOVO km_troca para calcular a próxima troca
-                proxima_troca_km = km_troca + LIMITE_KM_TROCA
+                proxima_troca_km = km_troca + LIMITE_KM_TROCA if km_troca is not None else None
                 proxima_troca_horimetro = existing_data['proxima_troca_horimetro']
             else:
                 # Para novo registro
-                proxima_troca_km = km_troca + LIMITE_KM_TROCA
+                proxima_troca_km = km_troca + LIMITE_KM_TROCA if km_troca is not None else None
                 proxima_troca_horimetro = None
                 
         else:  # tipo == 'maquina'
             if horimetro_troca is None:
                 raise ValueError("Horímetro da troca é obrigatório para máquinas")
             
+            # Converter para float para garantir o tipo numérico
+            horimetro_troca = float(horimetro_troca) if horimetro_troca is not None else None
+            
             # Se já existe registro, calcular a próxima troca baseada no NOVO horimetro_troca
             if existing_data:
                 # Usar o NOVO horimetro_troca para calcular a próxima troca
-                proxima_troca_horimetro = horimetro_troca + LIMITE_HORIMETRO_TROCA
+                proxima_troca_horimetro = horimetro_troca + LIMITE_HORIMETRO_TROCA if horimetro_troca is not None else None
                 proxima_troca_km = existing_data['proxima_troca_km']
             else:
                 # Para novo registro
-                proxima_troca_horimetro = horimetro_troca + LIMITE_HORIMETRO_TROCA
+                proxima_troca_horimetro = horimetro_troca + LIMITE_HORIMETRO_TROCA if horimetro_troca is not None else None
                 proxima_troca_km = None
         
         cursor.execute('''

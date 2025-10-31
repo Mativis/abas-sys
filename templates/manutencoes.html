@@ -7,8 +7,8 @@
             <i class="bi bi-tools"></i> Controle de Manutenções
         </div>
         <div>
-            <button class="btn btn-light btn-sm me-2" onclick="imprimirRelatorioCompleto()" title="Imprimir Relatório">
-                <i class="bi bi-printer"></i> Relatório
+            <button class="btn btn-light btn-sm me-2" onclick="abrirModalFiltrosImpressao()" title="Imprimir Relatório com Filtros">
+                <i class="bi bi-printer"></i> Relatório com Filtros
             </button>
             <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#novaManutencaoModal">
                 <i class="bi bi-plus-circle"></i> Nova Manutenção
@@ -388,6 +388,100 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 <button type="button" class="btn btn-primary" onclick="imprimirManutencao()">
                     <i class="bi bi-printer"></i> Imprimir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Filtros para Impressão -->
+<div class="modal fade" id="filtrosImpressaoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Filtros para Relatório de Impressão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Identificação</label>
+                        <input type="text" class="form-control" id="filtroImpressaoIdentificacao" placeholder="Filtrar por identificação...">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="filtroImpressaoStatus">
+                            <option value="todos">Todos os status</option>
+                            <option value="aberto">Abertas</option>
+                            <option value="finalizado">Finalizadas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select" id="filtroImpressaoTipo">
+                            <option value="todos">Todos os tipos</option>
+                            <option value="corretiva">Corretiva</option>
+                            <option value="preventiva">Preventiva</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Frota</label>
+                        <select class="form-select" id="filtroImpressaoFrota">
+                            <option value="todos">Todas as frotas</option>
+                            <option value="apoio">Apoio</option>
+                            <option value="maquinas">Máquinas</option>
+                            <option value="equipamento">Equipamento</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Forma de Pagamento</label>
+                        <select class="form-select" id="filtroImpressaoPagamento">
+                            <option value="todos">Todas as formas</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="pix">PIX</option>
+                            <option value="cartao_credito">Cartão de Crédito</option>
+                            <option value="cartao_debito">Cartão de Débito</option>
+                            <option value="transferencia">Transferência</option>
+                            <option value="boleto">Boleto</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Ordenar por</label>
+                        <select class="form-select" id="filtroImpressaoOrdenar">
+                            <option value="data_abertura">Data de Abertura</option>
+                            <option value="valor">Valor</option>
+                            <option value="identificacao">Identificação</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Direção da Ordenação</label>
+                        <select class="form-select" id="filtroImpressaoOrdenarDirecao">
+                            <option value="desc">Decrescente</option>
+                            <option value="asc">Crescente</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Período - Data Início</label>
+                        <input type="date" class="form-control" id="filtroImpressaoDataInicio">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Período - Data Fim</label>
+                        <input type="date" class="form-control" id="filtroImpressaoDataFim">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="filtroImpressaoUsarFiltrosAtuais">
+                            <label class="form-check-label" for="filtroImpressaoUsarFiltrosAtuais">
+                                Usar filtros atuais da tela
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="imprimirComFiltros()">
+                    <i class="bi bi-printer"></i> Gerar Relatório
                 </button>
             </div>
         </div>
@@ -906,6 +1000,369 @@ function imprimirManutencao() {
     janelaImpressao.document.close();
 }
 
+// --- NOVAS FUNÇÕES PARA RELATÓRIO COM FILTROS ---
+
+function abrirModalFiltrosImpressao() {
+    // Preencher os campos do modal com os filtros atuais (opcional)
+    document.getElementById('filtroImpressaoIdentificacao').value = document.getElementById('filtroIdentificacao').value;
+    document.getElementById('filtroImpressaoStatus').value = document.getElementById('filtroStatus').value;
+    document.getElementById('filtroImpressaoTipo').value = document.getElementById('filtroTipo').value;
+    document.getElementById('filtroImpressaoFrota').value = document.getElementById('filtroFrota').value;
+    document.getElementById('filtroImpressaoPagamento').value = document.getElementById('filtroPagamento').value;
+    
+    // Definir datas padrão (últimos 30 dias)
+    const dataFim = new Date();
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - 30);
+    
+    document.getElementById('filtroImpressaoDataFim').value = dataFim.toISOString().split('T')[0];
+    document.getElementById('filtroImpressaoDataInicio').value = dataInicio.toISOString().split('T')[0];
+    
+    // Abrir o modal
+    new bootstrap.Modal(document.getElementById('filtrosImpressaoModal')).show();
+}
+
+function imprimirComFiltros() {
+    const usarFiltrosAtuais = document.getElementById('filtroImpressaoUsarFiltrosAtuais').checked;
+    
+    let filtros = {};
+    
+    if (usarFiltrosAtuais) {
+        // Usar filtros atuais da tela
+        filtros = {
+            identificacao: document.getElementById('filtroIdentificacao').value,
+            status: document.getElementById('filtroStatus').value,
+            tipo: document.getElementById('filtroTipo').value,
+            frota: document.getElementById('filtroFrota').value,
+            pagamento: document.getElementById('filtroPagamento').value,
+            data_inicio: '',
+            data_fim: '',
+            ordenar_por: 'data_abertura',
+            ordenar_direcao: 'desc'
+        };
+    } else {
+        // Usar filtros do modal
+        filtros = {
+            identificacao: document.getElementById('filtroImpressaoIdentificacao').value,
+            status: document.getElementById('filtroImpressaoStatus').value,
+            tipo: document.getElementById('filtroImpressaoTipo').value,
+            frota: document.getElementById('filtroImpressaoFrota').value,
+            pagamento: document.getElementById('filtroImpressaoPagamento').value,
+            data_inicio: document.getElementById('filtroImpressaoDataInicio').value,
+            data_fim: document.getElementById('filtroImpressaoDataFim').value,
+            ordenar_por: document.getElementById('filtroImpressaoOrdenar').value,
+            ordenar_direcao: document.getElementById('filtroImpressaoOrdenarDirecao').value
+        };
+    }
+    
+    // Construir query string com os filtros
+    const params = new URLSearchParams();
+    Object.keys(filtros).forEach(key => {
+        if (filtros[key] && filtros[key] !== 'todos') {
+            params.append(key, filtros[key]);
+        }
+    });
+    
+    // Buscar dados filtrados para impressão
+    fetch(`/api/manutencoes/relatorio?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('filtrosImpressaoModal')).hide();
+                abrirJanelaImpressao(data);
+            } else {
+                showAlert('Erro ao gerar relatório: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showAlert('Erro ao gerar relatório', 'danger');
+        });
+}
+
+function abrirJanelaImpressao(data) {
+    const { manutencoes, estatisticas, filtros_aplicados } = data;
+    
+    const janelaImpressao = window.open('', '_blank');
+    const dataEmissao = new Date().toLocaleDateString('pt-BR');
+    const horaEmissao = new Date().toLocaleTimeString('pt-BR');
+    
+    // Construir HTML do relatório
+    let htmlRelatorio = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Relatório de Manutenções</title>
+            <meta charset="UTF-8">
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 20px;
+                    color: #333;
+                }
+                .header { 
+                    text-align: center; 
+                    margin-bottom: 30px;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 10px;
+                }
+                .header h1 { 
+                    margin: 0; 
+                    color: #0d6efd;
+                }
+                .info-emissao {
+                    text-align: right;
+                    font-size: 12px;
+                    color: #666;
+                    margin-bottom: 20px;
+                }
+                .resumo {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin-bottom: 20px;
+                    border-left: 4px solid #0d6efd;
+                }
+                .resumo-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 15px;
+                    margin-bottom: 20px;
+                }
+                .resumo-item {
+                    text-align: center;
+                    padding: 10px;
+                    background: white;
+                    border-radius: 5px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                }
+                .resumo-item h3 {
+                    margin: 0;
+                    font-size: 24px;
+                    color: #0d6efd;
+                }
+                .resumo-item p {
+                    margin: 5px 0 0 0;
+                    font-size: 12px;
+                    color: #666;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 20px;
+                    font-size: 12px;
+                }
+                th {
+                    background-color: #343a40;
+                    color: white;
+                    padding: 8px;
+                    text-align: left;
+                    border: 1px solid #dee2e6;
+                }
+                td {
+                    padding: 8px;
+                    border: 1px solid #dee2e6;
+                }
+                tr:nth-child(even) {
+                    background-color: #f8f9fa;
+                }
+                .status-aberto { color: #fd7e14; font-weight: bold; }
+                .status-finalizado { color: #198754; font-weight: bold; }
+                .badge {
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                .badge-aberto { background: #fff3cd; color: #856404; }
+                .badge-finalizado { background: #d1e7dd; color: #0f5132; }
+                .filtros-info {
+                    background: #e9ecef;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin-bottom: 20px;
+                    font-size: 12px;
+                }
+                .filtros-info h4 {
+                    margin: 0 0 10px 0;
+                    color: #495057;
+                }
+                .filtro-item {
+                    display: inline-block;
+                    margin-right: 15px;
+                }
+                .filtro-item strong {
+                    color: #495057;
+                }
+                @media print {
+                    body { margin: 0; }
+                    .no-print { display: none; }
+                    .header { margin-top: 0; }
+                }
+                .total-geral {
+                    background: #e7f3ff;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    text-align: center;
+                    font-weight: bold;
+                    border: 1px solid #b6d4fe;
+                }
+                .periodo-info {
+                    background: #fff3cd;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin-bottom: 15px;
+                    border-left: 4px solid #ffc107;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Relatório de Manutenções</h1>
+                <p>Sistema de Gestão de Frotas</p>
+            </div>
+            
+            <div class="info-emissao">
+                Emitido em: ${dataEmissao} às ${horaEmissao}
+            </div>
+    `;
+    
+    // Informações de período se aplicável
+    if (filtros_aplicados.data_inicio || filtros_aplicados.data_fim) {
+        const periodoInicio = filtros_aplicados.data_inicio ? 
+            new Date(filtros_aplicados.data_inicio).toLocaleDateString('pt-BR') : 'Início indefinido';
+        const periodoFim = filtros_aplicados.data_fim ? 
+            new Date(filtros_aplicados.data_fim).toLocaleDateString('pt-BR') : 'Fim indefinido';
+        
+        htmlRelatorio += `
+            <div class="periodo-info">
+                <strong>Período:</strong> ${periodoInicio} à ${periodoFim}
+            </div>
+        `;
+    }
+    
+    htmlRelatorio += `
+            <div class="filtros-info">
+                <h4>Filtros Aplicados:</h4>
+                <div class="filtro-item"><strong>Identificação:</strong> ${filtros_aplicados.identificacao || 'Todos'}</div>
+                <div class="filtro-item"><strong>Status:</strong> ${filtros_aplicados.status === 'aberto' ? 'Abertas' : filtros_aplicados.status === 'finalizado' ? 'Finalizadas' : 'Todos'}</div>
+                <div class="filtro-item"><strong>Tipo:</strong> ${filtros_aplicados.tipo === 'corretiva' ? 'Corretiva' : filtros_aplicados.tipo === 'preventiva' ? 'Preventiva' : 'Todos'}</div>
+                <div class="filtro-item"><strong>Frota:</strong> ${filtros_aplicados.frota === 'apoio' ? 'Apoio' : filtros_aplicados.frota === 'maquinas' ? 'Máquinas' : filtros_aplicados.frota === 'equipamento' ? 'Equipamento' : 'Todos'}</div>
+                <div class="filtro-item"><strong>Pagamento:</strong> ${filtros_aplicados.pagamento && filtros_aplicados.pagamento !== 'todos' ? filtros_aplicados.pagamento : 'Todos'}</div>
+                <div class="filtro-item"><strong>Ordenação:</strong> ${filtros_aplicados.ordenar_por === 'valor' ? 'Valor' : filtros_aplicados.ordenar_por === 'identificacao' ? 'Identificação' : 'Data'} (${filtros_aplicados.ordenar_direcao === 'asc' ? 'Crescente' : 'Decrescente'})</div>
+            </div>
+            
+            <div class="resumo-grid">
+                <div class="resumo-item">
+                    <h3>${estatisticas.total}</h3>
+                    <p>TOTAL DE MANUTENÇÕES</p>
+                </div>
+                <div class="resumo-item">
+                    <h3>${estatisticas.abertas}</h3>
+                    <p>EM ABERTO</p>
+                </div>
+                <div class="resumo-item">
+                    <h3>${estatisticas.finalizadas}</h3>
+                    <p>FINALIZADAS</p>
+                </div>
+                <div class="resumo-item">
+                    <h3>R$ ${estatisticas.valor_total.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
+                    <p>VALOR TOTAL</p>
+                </div>
+            </div>
+    `;
+    
+    // Tabela de manutenções
+    if (manutencoes.length > 0) {
+        htmlRelatorio += `
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Identificação</th>
+                        <th>Tipo</th>
+                        <th>Frota</th>
+                        <th>Descrição</th>
+                        <th>Fornecedor</th>
+                        <th>Valor (R$)</th>
+                        <th>Pagamento</th>
+                        <th>Status</th>
+                        <th>Data Abertura</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        manutencoes.forEach(manutencao => {
+            const tipoFormatado = manutencao.tipo === 'corretiva' ? 'Corretiva' : 'Preventiva';
+            const frotaFormatada = {
+                'apoio': 'Apoio',
+                'maquinas': 'Máquinas',
+                'equipamento': 'Equipamento'
+            }[manutencao.frota] || manutencao.frota;
+            
+            const valorFormatado = manutencao.valor ? 
+                manutencao.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0,00';
+            
+            const pagamentoFormatado = manutencao.forma_pagamento ? 
+                `${manutencao.forma_pagamento}${manutencao.parcelas && manutencao.parcelas > 1 ? ` (${manutencao.parcelas}x)` : ''}` : 
+                '-';
+            
+            const statusClass = manutencao.finalizada ? 'status-finalizado badge badge-finalizado' : 'status-aberto badge badge-aberto';
+            const statusText = manutencao.finalizada ? 'FINALIZADA' : 'EM ABERTO';
+            
+            const dataAbertura = manutencao.data_abertura ? 
+                new Date(manutencao.data_abertura).toLocaleDateString('pt-BR') : '-';
+            
+            htmlRelatorio += `
+                <tr>
+                    <td>${manutencao.id}</td>
+                    <td>${manutencao.identificacao}</td>
+                    <td>${tipoFormatado}</td>
+                    <td>${frotaFormatada}</td>
+                    <td>${manutencao.descricao}</td>
+                    <td>${manutencao.fornecedor || '-'}</td>
+                    <td style="text-align: right;">${valorFormatado}</td>
+                    <td>${pagamentoFormatado}</td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                    <td>${dataAbertura}</td>
+                </tr>
+            `;
+        });
+        
+        htmlRelatorio += `
+                </tbody>
+            </table>
+            
+            <div class="total-geral">
+                TOTAL GERAL: R$ ${estatisticas.valor_total.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+        `;
+    } else {
+        htmlRelatorio += `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h3>Nenhuma manutenção encontrada com os filtros aplicados</h3>
+            </div>
+        `;
+    }
+    
+    htmlRelatorio += `
+            <div class="no-print" style="margin-top: 30px; text-align: center;">
+                <button onclick="window.print()" style="padding: 10px 20px; background: #0d6efd; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                    Imprimir Relatório
+                </button>
+                <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Fechar
+                </button>
+            </div>
+        </body>
+        </html>
+    `;
+    
+    janelaImpressao.document.write(htmlRelatorio);
+    janelaImpressao.document.close();
+}
 
 function showAlert(message, type) {
     const alertDiv = document.createElement('div');
